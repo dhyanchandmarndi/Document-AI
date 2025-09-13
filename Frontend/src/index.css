@@ -1,32 +1,4 @@
-body {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: Arial, sans-serif;
-  background: #fafafa;
-}
-
-.logo {
-  font-size: 3.2rem;
-  grid-column: span 3;
-}
-
-.main-container {
-  width: 80%;
-  height: 20rem;
-  margin: 10rem auto;
-  text-align: center;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.ask-container {
-  grid-column: span 3;
-}
-
-.chat-container {
-}
-
-.chat-text-area {
-  width: 100%;
+@import "tailwindcss";
+body{
+    background-color: #222222;
 }
