@@ -2,120 +2,175 @@
 import React from "react";
 
 const Sidebar = ({ collapsed, onToggle, onNewChat }) => {
-  const historyItems = [
-    "Chat about Q3 Financials",
-    "Analysis of Marketing Campaign", 
-    "New Project Proposal Insights"
+  // Sample chat history - in real app, this would come from props or state
+  const chatHistory = [
+    "Financial Report Analysis Q3 2024",
+    "Marketing Campaign Performance Review",
+    "Project Proposal Risk Assessment",
+    "Customer Feedback Summary Document",
+    "Quarterly Sales Data Analysis",
+    "Product Development Strategy",
+    "Budget Planning Document Review",
+    "Competitive Analysis Report",
+    "User Experience Research Findings",
+    "Technical Documentation Review",
+    "Market Research Survey Results",
+    "Annual Performance Report"
   ];
 
   return (
-    <div className={`flex flex-col bg-[#222222] p-4 border-r border-gray-700 transition-all duration-300 ${
-      collapsed ? 'w-20' : 'w-64'
-    }`}>
-      {/* Header */}
-      <div className="flex-shrink-0">
-        <div className={`flex items-center mb-6 ${
-          collapsed ? 'justify-center' : 'justify-between'
-        }`}>
-          {!collapsed && (
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-cyan-500 rounded-lg flex items-center justify-center mr-3">
-                <span className="text-white font-bold text-lg">D</span>
-              </div>
-              <span className="text-xl font-bold">DocumentAI</span>
-            </div>
-          )}
-          <button 
-            onClick={onToggle}
-            className="p-2 rounded-md hover:bg-gray-800 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-        </div>
+    <>
+      {/* Custom scrollbar styles for sidebar */}
+      <style jsx>{`
+        .sidebar-scroll {
+          /* Firefox */
+          scrollbar-width: thin;
+          scrollbar-color: #4a5568 transparent;
+        }
+        
+        /* Webkit browsers (Chrome, Safari, Edge) */
+        .sidebar-scroll::-webkit-scrollbar {
+          width: 4px;
+        }
+        
+        .sidebar-scroll::-webkit-scrollbar-track {
+          background: transparent;
+          border-radius: 2px;
+        }
+        
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+          background: #4a5568;
+          border-radius: 2px;
+          transition: all 0.2s ease;
+        }
+        
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+          background: #5a6478;
+        }
+        
+        /* Hide scrollbar buttons */
+        .sidebar-scroll::-webkit-scrollbar-button {
+          display: none;
+        }
+      `}</style>
 
-        {/* New Chat Button */}
-        <button 
-          onClick={onNewChat}
-          className="w-full flex items-center justify-center p-3 rounded-xl bg-cyan-500 hover:bg-cyan-600 mb-6 text-white transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          {!collapsed && <span className="ml-2">New Chat</span>}
-        </button>
-
-        {/* Navigation */}
-        <nav className="space-y-2">
-          <a className="flex items-center p-3 text-white bg-gray-800 rounded-xl transition-colors" href="#">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-            {!collapsed && <span className="ml-3">Home</span>}
-          </a>
+      {/* Fixed Sidebar */}
+      <div className={`fixed left-0 top-0 h-screen bg-[#222222] border-r border-gray-700 z-10 transition-all duration-300 ${
+        collapsed ? 'w-16' : 'w-64'
+      }`}>
+        <div className="flex flex-col h-full">
           
-          <a className="flex items-center p-3 text-gray-400 hover:bg-gray-800 rounded-xl transition-colors" href="#">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            {!collapsed && <span className="ml-3">Discover</span>}
-          </a>
-
-          <a className="flex items-center p-3 text-gray-400 hover:bg-gray-800 rounded-xl transition-colors" href="#">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            {!collapsed && <span className="ml-3">Spaces</span>}
-          </a>
-        </nav>
-
-        {/* History Section */}
-        {!collapsed && (
-          <div className="mt-8">
-            <h3 className="px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              History
-            </h3>
-            <div className="mt-3 space-y-1">
-              {historyItems.map((item, index) => (
-                <a
-                  key={index}
-                  className="block p-2 text-sm text-gray-400 hover:bg-gray-800 rounded-lg truncate transition-colors"
-                  href="#"
-                >
-                  {item}
-                </a>
-              ))}
+          {/* Header Section - Fixed at top */}
+          <div className="flex-shrink-0 p-4 border-b border-gray-700/50">
+            <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'}`}>
+              {!collapsed && (
+                <div className="flex items-center">
+                  <span className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                    DocumentAI
+                  </span>
+                </div>
+              )}
+              <button 
+                onClick={onToggle}
+                className="p-2 rounded-lg hover:bg-gray-800/60 transition-colors"
+                title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              >
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {collapsed ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  )}
+                </svg>
+              </button>
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Bottom Section */}
-      <div className="mt-auto space-y-2">
-        <a className="flex items-center p-3 text-gray-400 hover:bg-gray-800 rounded-xl transition-colors" href="#">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5V17z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.5 14H4a1 1 0 01-1-1V7a1 1 0 011-1h6.5" />
-          </svg>
-          {!collapsed && <span className="ml-3">Notifications</span>}
-        </a>
-
-        <a className="flex items-center p-3 text-gray-400 hover:bg-gray-800 rounded-xl transition-colors" href="#">
-          <div className="w-6 h-6 rounded-full bg-cyan-500 flex items-center justify-center flex-shrink-0">
-            <span className="text-xs font-bold text-white">P</span>
+          {/* New Chat Button - Fixed */}
+          <div className="flex-shrink-0 p-4">
+            <button 
+              onClick={onNewChat}
+              className={`w-full flex items-center justify-center p-3 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-cyan-500/25 ${
+                collapsed ? 'px-2' : 'px-3'
+              }`}
+              title="Start new chat"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              {!collapsed && <span className="ml-2">New Chat</span>}
+            </button>
           </div>
-          {!collapsed && (
-            <>
-              <span className="ml-3">Account</span>
-              <span className="ml-auto px-2 py-0.5 text-xs font-semibold text-white bg-cyan-500 rounded-full">
-                PRO
-              </span>
-            </>
-          )}
-        </a>
+
+          {/* Chat History - Scrollable Section */}
+          <div className="flex-1 flex flex-col min-h-0">
+            {!collapsed && (
+              <div className="px-4 py-2 border-b border-gray-700/30">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Chat History
+                </h3>
+              </div>
+            )}
+            
+            <div className="flex-1 overflow-y-auto sidebar-scroll">
+              <div className="p-2 space-y-1">
+                {chatHistory.map((chat, index) => (
+                  <button
+                    key={index}
+                    className={`w-full text-left p-3 text-sm text-gray-400 hover:bg-gray-800/60 rounded-lg transition-all duration-200 hover:text-gray-200 group ${
+                      collapsed ? 'px-2' : 'px-3'
+                    }`}
+                    title={collapsed ? chat : ""}
+                  >
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 text-gray-500 group-hover:text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.955 8.955 0 01-2.646-.388l-2.729 1.093a.5.5 0 01-.67-.65L8.051 17.95A8 8 0 1121 12z" />
+                      </svg>
+                      {!collapsed && (
+                        <span className="ml-3 truncate leading-5">
+                          {chat}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Account Section - Fixed at bottom */}
+          <div className="flex-shrink-0 p-4 border-t border-gray-700/50">
+            <button className={`w-full flex items-center p-3 text-gray-400 hover:bg-gray-800/60 rounded-xl transition-all duration-200 hover:text-gray-200 ${
+              collapsed ? 'justify-center' : ''
+            }`}>
+              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-400 to-cyan-600 flex items-center justify-center flex-shrink-0">
+                <span className="text-sm font-bold text-white">P</span>
+              </div>
+              {!collapsed && (
+                <>
+                  <div className="ml-3 flex-1 text-left">
+                    <div className="text-sm font-medium text-white">Account</div>
+                    <div className="text-xs text-gray-500">Pro Plan</div>
+                  </div>
+                  <span className="ml-2 px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-full">
+                    PRO
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
+
+        </div>
       </div>
-    </div>
+
+      {/* Mobile Overlay */}
+      {!collapsed && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-5 lg:hidden"
+          onClick={onToggle}
+        />
+      )}
+    </>
   );
 };
 

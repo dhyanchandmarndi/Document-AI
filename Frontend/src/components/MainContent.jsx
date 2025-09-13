@@ -4,7 +4,7 @@ import SmartTextBox from "./SmartTextBox";
 
 const MainContent = ({ messages, onSend, sidebarCollapsed }) => {
   return (
-    <div className="flex-1 flex flex-col bg-[#222222]">
+    <div className="flex flex-col h-full bg-[#222222]">
       {messages.length === 0 ? (
         // Welcome screen
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
@@ -19,26 +19,17 @@ const MainContent = ({ messages, onSend, sidebarCollapsed }) => {
               </p>
             </div>
 
-            {/* Input Box - now the main focus */}
+            {/* Input Box */}
             <div className="mb-8">
               <SmartTextBox onSend={onSend} />
             </div>
           </div>
-
-          {/* Help button */}
-          <div className="absolute bottom-6 right-6">
-            <button className="w-10 h-10 flex items-center justify-center bg-gray-800/60 backdrop-blur-sm hover:bg-gray-700/60 rounded-full transition-all duration-200 border border-gray-700/30">
-              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-          </div>
         </div>
       ) : (
         // Chat view
-        <div className="flex-1 flex flex-col">
-          {/* Chat messages with custom scrollbar */}
-          <div className="flex-1 overflow-y-auto p-6 chat-container" style={{
+        <div className="flex flex-col h-full">
+          {/* Chat messages */}
+          <div className="flex-1 overflow-y-auto p-6" style={{
             scrollbarWidth: 'thin',
             scrollbarColor: '#4a5568 transparent'
           }}>
@@ -50,12 +41,6 @@ const MainContent = ({ messages, onSend, sidebarCollapsed }) => {
                       U
                     </div>
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-medium text-white text-sm">You</span>
-                        <span className="text-xs text-gray-500 bg-gray-800/40 px-2 py-0.5 rounded-full">
-                          {message.timestamp.toLocaleTimeString()}
-                        </span>
-                      </div>
                       <div className="text-gray-200 leading-relaxed">
                         {message.text}
                       </div>
