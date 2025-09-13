@@ -6,19 +6,26 @@ import MainContent from "./components/MainContent";
 export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [messages, setMessages] = useState([]);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Handle responsive behavior
+  // Enhanced responsive behavior
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 1024) { // lg breakpoint
+      const width = window.innerWidth;
+      setIsMobile(width < 768); // md breakpoint
+      
+      // Auto-collapse sidebar on small screens, but don't force it
+      if (width < 1024 && !isMobile) { // lg breakpoint
         setSidebarCollapsed(true);
+      } else if (width >= 1280) { // xl breakpoint
+        setSidebarCollapsed(false);
       }
     };
 
     handleResize(); // Check on initial load
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [isMobile]);
 
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
@@ -32,10 +39,19 @@ export default function App() {
       timestamp: new Date()
     };
     setMessages(prev => [...prev, newMessage]);
+    
+    // Auto-close sidebar on mobile after sending message
+    if (isMobile && !sidebarCollapsed) {
+      setSidebarCollapsed(true);
+    }
   };
 
   const handleNewChat = () => {
     setMessages([]);
+    // Auto-close sidebar on mobile after new chat
+    if (isMobile) {
+      setSidebarCollapsed(true);
+    }
   };
 
   return (
@@ -44,16 +60,21 @@ export default function App() {
         collapsed={sidebarCollapsed} 
         onToggle={toggleSidebar}
         onNewChat={handleNewChat}
+        isMobile={isMobile}
       />
       
-      {/* Main content with proper margin */}
+      {/* Main content with responsive margins */}
       <div className={`h-full transition-all duration-300 ${
-        sidebarCollapsed ? 'ml-16' : 'ml-64'
+        isMobile 
+          ? 'ml-0' // No margin on mobile - sidebar overlays
+          : (sidebarCollapsed ? 'ml-16' : 'ml-64') // Desktop margins
       }`}>
         <MainContent 
           messages={messages}
           onSend={handleSend}
           sidebarCollapsed={sidebarCollapsed}
+          isMobile={isMobile}
+          onToggleSidebar={toggleSidebar}
         />
       </div>
     </div>
