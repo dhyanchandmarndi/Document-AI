@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+// const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 // const chunkingRoutes = require("./routes/chunking");
@@ -26,19 +26,19 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100
-});
-app.use('/api/', limiter);
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 100
+// });
+// app.use('/api/', limiter);
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5
-});
+// const authLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 5
+// });
 
 // Routes
-app.use('/api/auth', authLimiter, userRoutes);
+app.use('/api/auth', userRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
