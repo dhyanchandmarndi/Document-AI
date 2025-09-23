@@ -9,6 +9,7 @@ require('dotenv').config();
 
 const { testConnection } = require('./models');
 const userRoutes = require('./routes/user');
+const documentRoutes = require('./routes/document');
 
 const PORT = process.env.PORT || 8000;
 const app = express();
@@ -39,6 +40,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes
 app.use('/api/auth', userRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -54,12 +56,22 @@ app.get('/', (req, res) => {
   res.json({
     success: true,
     message: 'Document AI Backend API',
+    version: '1.0.0',
     endpoints: {
-      health: '/api/health',
+      health: 'GET /api/health',
       auth: {
         register: 'POST /api/auth/register',
         login: 'POST /api/auth/login',
-        profile: 'GET /api/auth/profile'
+        profile: 'GET /api/auth/profile',
+        updateProfile: 'PUT /api/auth/profile',
+        changePassword: 'POST /api/auth/change-password'
+      },
+      documents: {
+        upload: 'POST /api/documents/upload',
+        list: 'GET /api/documents',
+        get: 'GET /api/documents/:id',
+        status: 'GET /api/documents/:id/status',
+        delete: 'DELETE /api/documents/:id'
       }
     }
   });

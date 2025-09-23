@@ -1,4 +1,4 @@
-// src/models/index.js
+// src/models/index.js (add Document import and associations)
 const { Sequelize } = require('sequelize');
 const path = require('path');
 
@@ -49,11 +49,11 @@ const sequelize = new Sequelize(
 const testConnection = async () => {
   try {
     await sequelize.authenticate();
-    console.log('Database connection established successfully');
+    console.log('✅ Database connection established successfully');
     return true;
   } catch (error) {
-    console.error('Unable to connect to database:', error.message);
-    console.error('Connection details:', {
+    console.error('❌ Unable to connect to database:', error.message);
+    console.error('❌ Connection details:', {
       host: dbConfig.host,
       port: dbConfig.port,
       database: dbConfig.database,
@@ -66,12 +66,26 @@ const testConnection = async () => {
 
 // Import models
 const User = require('./User')(sequelize, Sequelize.DataTypes);
+const Document = require('./document')(sequelize, Sequelize.DataTypes);
+
+// Define associations
+User.hasMany(Document, { 
+  foreignKey: 'user_id', 
+  as: 'documents',
+  onDelete: 'CASCADE'
+});
+
+Document.belongsTo(User, { 
+  foreignKey: 'user_id', 
+  as: 'user'
+});
 
 // Export everything
 const db = {
   sequelize,
   Sequelize,
-  User
+  User,
+  Document // ✅ Export Document model
 };
 
 module.exports = {
