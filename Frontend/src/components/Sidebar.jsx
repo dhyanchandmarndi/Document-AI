@@ -1,7 +1,10 @@
 // components/Sidebar.jsx
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 
-const Sidebar = ({ collapsed, onToggle, onNewChat, isMobile }) => {
+const Sidebar = ({ collapsed, onToggle, onNewChat, isMobile, user, onLogout }) => {
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef(null);
+
   // Sample chat history
   const chatHistory = [
     "Financial Report Analysis Q3 2024",
@@ -9,56 +12,40 @@ const Sidebar = ({ collapsed, onToggle, onNewChat, isMobile }) => {
     "Project Proposal Risk Assessment",
     "Customer Feedback Summary Document",
     "Quarterly Sales Data Analysis",
-    "Product Development Strategy",
-    "Budget Planning Document Review",
-    "Competitive Analysis Report",
-    "User Experience Research Findings",
-    "Technical Documentation Review",
-    "Market Research Survey Results",
-    "Annual Performance Report"
   ];
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Handle user menu toggle
+  const toggleUserMenu = () => {
+    setShowUserMenu(!showUserMenu);
+  };
+
+  // Handle logout with menu close
+  const handleLogout = () => {
+    setShowUserMenu(false);
+    onLogout();
+  };
 
   return (
     <>
-      {/* Custom scrollbar styles for sidebar */}
-      <style jsx>{`
-        .sidebar-scroll {
-          /* Firefox */
-          scrollbar-width: thin;
-          scrollbar-color: #4a5568 transparent;
-        }
-        
-        /* Webkit browsers (Chrome, Safari, Edge) */
-        .sidebar-scroll::-webkit-scrollbar {
-          width: 4px;
-        }
-        
-        .sidebar-scroll::-webkit-scrollbar-track {
-          background: transparent;
-          border-radius: 2px;
-        }
-        
-        .sidebar-scroll::-webkit-scrollbar-thumb {
-          background: #4a5568;
-          border-radius: 2px;
-          transition: all 0.2s ease;
-        }
-        
-        .sidebar-scroll::-webkit-scrollbar-thumb:hover {
-          background: #5a6478;
-        }
-        
-        /* Hide scrollbar buttons */
-        .sidebar-scroll::-webkit-scrollbar-button {
-          display: none;
-        }
-      `}</style>
-
       {/* Fixed Sidebar */}
       <div className={`fixed left-0 top-0 h-screen bg-[#222222] border-r border-gray-700 z-30 transition-all duration-300 ${
         isMobile 
           ? `w-80 ${collapsed ? '-translate-x-full' : 'translate-x-0'}` // Mobile: slide in/out
-          : `${collapsed ? 'w-16' : 'w-64'}` // Desktop: same as original
+          : `${collapsed ? 'w-16' : 'w-64'}` // Desktop: collapse/expand
       }`}>
         <div className="flex flex-col h-full">
           
@@ -92,7 +79,7 @@ const Sidebar = ({ collapsed, onToggle, onNewChat, isMobile }) => {
             </div>
           </div>
 
-          {/* New Chat Button - Fixed - EXACT SAME AS ORIGINAL */}
+          {/* New Chat Button */}
           <div className="flex-shrink-0 p-4">
             <button 
               onClick={onNewChat}
@@ -101,7 +88,6 @@ const Sidebar = ({ collapsed, onToggle, onNewChat, isMobile }) => {
               }`}
               title="Start new chat"
             >
-              {/* ORIGINAL ICON SIZE FROM YOUR REFERENCE */}
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
@@ -109,7 +95,7 @@ const Sidebar = ({ collapsed, onToggle, onNewChat, isMobile }) => {
             </button>
           </div>
 
-          {/* Chat History - Scrollable Section - EXACT SAME AS ORIGINAL */}
+          {/* Chat History - Scrollable Section */}
           <div className="flex-1 flex flex-col min-h-0">
             {(!collapsed || isMobile) && (
               <div className="px-4 py-2 border-b border-gray-700/30">
@@ -132,7 +118,6 @@ const Sidebar = ({ collapsed, onToggle, onNewChat, isMobile }) => {
                     <div className={`flex items-center ${
                       collapsed && !isMobile ? 'justify-center' : ''
                     }`}>
-                      {/* ORIGINAL ICON SIZE FROM YOUR REFERENCE */}
                       <svg className="w-4 h-4 text-gray-500 group-hover:text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.955 8.955 0 01-2.646-.388l-2.729 1.093a.5.5 0 01-.67-.65L8.051 17.95A8 8 0 1121 12z" />
                       </svg>
@@ -148,26 +133,78 @@ const Sidebar = ({ collapsed, onToggle, onNewChat, isMobile }) => {
             </div>
           </div>
 
-          {/* Account Section - Fixed at bottom - EXACT SAME AS ORIGINAL */}
-          <div className="flex-shrink-0 p-4 border-t border-gray-700/50">
-            <button className={`w-full flex items-center p-3 text-gray-400 hover:bg-gray-800/60 rounded-xl transition-all duration-200 hover:text-gray-200 ${
-              collapsed && !isMobile ? 'justify-center' : ''
-            }`}>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-400 to-cyan-600 flex items-center justify-center flex-shrink-0">
-                <span className="text-sm font-bold text-white">P</span>
-              </div>
-              {(!collapsed || isMobile) && (
-                <>
-                  <div className="ml-3 flex-1 text-left">
-                    <div className="text-sm font-medium text-white">Account</div>
-                    <div className="text-xs text-gray-500">Pro Plan</div>
+          {/* User Account Section - Fixed at bottom */}
+          <div className="flex-shrink-0 p-4 border-t border-gray-700/50 relative" ref={userMenuRef}>
+            {/* User Info Button - Expanded state */}
+            {user && (!collapsed || isMobile) && (
+              <button 
+                onClick={toggleUserMenu}
+                className="w-full p-3 bg-gray-800/30 hover:bg-gray-800/50 rounded-lg transition-all duration-200 group"
+              >
+                <div className="flex items-center">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-400 to-cyan-600 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-white">
+                      {user.name?.charAt(0)?.toUpperCase() || 'U'}
+                    </span>
                   </div>
-                  <span className="ml-2 px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-full">
-                    PRO
+                  <div className="ml-3 flex-1 min-w-0 text-left">
+                    <div className="text-sm font-medium text-white truncate">
+                      {user.name || 'User'}
+                    </div>
+                    <div className="text-xs text-gray-400 truncate">
+                      {user.email}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            )}
+
+            {/* User Info Button - Collapsed state */}
+            {user && collapsed && !isMobile && (
+              <button 
+                onClick={toggleUserMenu}
+                className="w-full flex justify-center hover:bg-gray-800/50 rounded-lg transition-all duration-200"
+                title={`${user.name || 'User'} - Click for options`}
+              >
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-400 to-cyan-600 flex items-center justify-center">
+                  <span className="text-sm font-bold text-white">
+                    {user.name?.charAt(0)?.toUpperCase() || 'U'}
                   </span>
-                </>
-              )}
-            </button>
+                </div>
+              </button>
+            )}
+
+            {/* Dropdown Menu */}
+            {showUserMenu && (!collapsed || isMobile) && (
+              <div className={`absolute bottom-full left-4 right-4 mb-2 bg-[#2a2a2a] border border-gray-600 rounded-lg shadow-xl z-50 ${
+                collapsed && !isMobile ? 'left-2 right-2' : ''
+              }`}>
+                {/* User info in dropdown (for collapsed state) */}
+                {collapsed && !isMobile && (
+                  <div className="p-3 border-b border-gray-600">
+                    <div className="text-sm font-medium text-white truncate">
+                      {user.name || 'User'}
+                    </div>
+                    <div className="text-xs text-gray-400 truncate">
+                      {user.email}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Menu items */}
+                <div className="p-1">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center px-3 py-2 text-sm text-gray-300 hover:bg-red-500/10 hover:text-red-400 rounded-md transition-all duration-200"
+                  >
+                    <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Logout
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
         </div>

@@ -1,19 +1,17 @@
-import { pipeline } from "@xenova/transformers";
-
 let extractor = null;
 
-// Initialize model once
-const loadModel = async () => {
+// Lazy load Xenova transformers pipeline (dynamic import in CommonJS)
+async function loadModel() {
   if (!extractor) {
+    const { pipeline } = await import("@xenova/transformers");
     extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
   }
   return extractor;
-};
+}
 
-// create embeddings
-export const getEmbeddings = async (textChunks) => {
+// Create embeddings
+async function getEmbeddings(textChunks) {
   const model = await loadModel();
-
   const results = [];
 
   for (const chunk of textChunks) {
@@ -32,4 +30,6 @@ export const getEmbeddings = async (textChunks) => {
   }
 
   return results; // array of { id, text, embedding, metadata, navigation }
-};
+}
+
+module.exports = { getEmbeddings };
