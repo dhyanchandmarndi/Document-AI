@@ -1,25 +1,28 @@
 // src/services/documentService.js
-const fs = require('fs');
-const path = require('path');
-const pdfParse = require('pdf-parse');
+const fs = require("fs");
+const path = require("path");
+const pdfParse = require("pdf-parse");
 // const { v4: uuidv4 } = require('uuid');
-const { db } = require('../models');
+const { db } = require("../models");
+const { getEmbeddings } = require("../utils/embedding-model");
+const ChromaHelper = require("../utils/chromaHelper");
+const { ParagraphChunker } = require("../services/ParagraphChunker");
 
+const chromaHelper = new ChromaHelper();
 class DocumentService {
-  
   // Process uploaded PDF file
   async processDocument(file, userId) {
     let document = null;
-    
+
     try {
       console.log(`Starting document processing for user ${userId}`);
-      
+
       // 1. Create document record in database
       document = await db.Document.create({
         user_id: userId,
         original_filename: file.originalname,
         file_size: file.size,
-        processing_status: 'uploading'
+        processing_status: "uploading",
       });
 
       console.log(`Document record created: ${document.id}`);
@@ -32,31 +35,50 @@ class DocumentService {
       const { text, pageCount } = await this.extractTextFromPDF(file.buffer);
       console.log(`Extracted text from ${pageCount} pages`);
 
-      // 4. For now, we'll just complete without ChromaDB (we'll add that later)
-      const chunkCount = Math.ceil(text.length / 1000); // Estimate chunks
-      const chromaCollectionId = `doc_${document.id}_chunks`;
+      // 4. Create chunks using ParagraphChunker
+      const chunker = new ParagraphChunker({
+        maxTokens: 1000,
+        minTokens: 100,
+        overlapTokens: 50,
+        combineThreshold: 200,
+      }); // Adjust based on your chunker initialization
 
-      // 5. Mark as completed
+      const chunks = await chunker.chunk(text, {
+        documentId: document.id,
+        filename: file.originalname,
+        userId: userId,
+      });
+
+      const chunkCount = chunks.length;
+      console.log(`Created ${chunkCount} chunks`);
+
+      // 5. Store in ChromaDB (ChromaDB will generate embeddings automatically)
+      const chromaCollectionId = `doc_${document.id}_chunks`;
+      await chromaHelper.storeInChromaDB(chromaCollectionId, chunks);
+      console.log(
+        `Stored ${chunkCount} chunks in ChromaDB collection: ${chromaCollectionId}`
+      );
+
+      // 7. Mark as completed
       await document.markAsCompleted(pageCount, chunkCount, chromaCollectionId);
       console.log(`Document processing completed`);
 
-      // 6. File buffer is automatically garbage collected (no storage)
+      // 8. File buffer is automatically garbage collected (no storage)
       console.log(`PDF buffer released from memory`);
 
       return {
         success: true,
         document: document,
-        message: 'Document processed successfully'
+        message: "Document processed successfully",
       };
-
     } catch (error) {
-      console.error('Document processing error:', error);
-      
+      console.error("Document processing error:", error);
+
       // Mark document as failed if it was created
       if (document) {
         await document.markAsFailed(error.message);
       }
-      
+
       throw new Error(`Document processing failed: ${error.message}`);
     }
   }
@@ -64,15 +86,17 @@ class DocumentService {
   // Extract text from PDF buffer
   async extractTextFromPDF(pdfBuffer) {
     try {
-      console.log('🔍 Starting PDF text extraction...');
-      
+      console.log("🔍 Starting PDF text extraction...");
+
       const pdfData = await pdfParse(pdfBuffer);
-      
+
       if (!pdfData.text || pdfData.text.trim().length === 0) {
-        throw new Error('No text content found in PDF');
+        throw new Error("No text content found in PDF");
       }
 
-      console.log(`PDF Stats: ${pdfData.numpages} pages, ${pdfData.text.length} characters`);
+      console.log(
+        `PDF Stats: ${pdfData.numpages} pages, ${pdfData.text.length} characters`
+      );
 
       return {
         text: pdfData.text.trim(),
@@ -80,11 +104,11 @@ class DocumentService {
         metadata: {
           title: pdfData.info?.Title || null,
           author: pdfData.info?.Author || null,
-          createdAt: pdfData.info?.CreationDate || null
-        }
+          createdAt: pdfData.info?.CreationDate || null,
+        },
       };
     } catch (error) {
-      console.error('PDF extraction error:', error);
+      console.error("PDF extraction error:", error);
       throw new Error(`Failed to extract text from PDF: ${error.message}`);
     }
   }
@@ -94,25 +118,25 @@ class DocumentService {
     try {
       const documents = await db.Document.findByUser(userId, {
         attributes: [
-          'id', 
-          'original_filename', 
-          'file_size', 
-          'total_pages', 
-          'chunk_count',
-          'processing_status', 
-          'processed_at', 
-          'created_at'
+          "id",
+          "original_filename",
+          "file_size",
+          "total_pages",
+          "chunk_count",
+          "processing_status",
+          "processed_at",
+          "created_at",
         ],
-        ...options
+        ...options,
       });
 
       return {
         success: true,
         documents: documents,
-        count: documents.length
+        count: documents.length,
       };
     } catch (error) {
-      console.error('Get user documents error:', error);
+      console.error("Get user documents error:", error);
       throw new Error(`Failed to get user documents: ${error.message}`);
     }
   }
@@ -121,22 +145,22 @@ class DocumentService {
   async getDocumentById(documentId, userId) {
     try {
       const document = await db.Document.findOne({
-        where: { 
-          id: documentId, 
-          user_id: userId 
-        }
+        where: {
+          id: documentId,
+          user_id: userId,
+        },
       });
 
       if (!document) {
-        throw new Error('Document not found');
+        throw new Error("Document not found");
       }
 
       return {
         success: true,
-        document: document
+        document: document,
       };
     } catch (error) {
-      console.error('Get document error:', error);
+      console.error("Get document error:", error);
       throw new Error(`Failed to get document: ${error.message}`);
     }
   }
@@ -145,28 +169,30 @@ class DocumentService {
   async deleteDocument(documentId, userId) {
     try {
       const document = await db.Document.findOne({
-        where: { 
-          id: documentId, 
-          user_id: userId 
-        }
+        where: {
+          id: documentId,
+          user_id: userId,
+        },
       });
 
       if (!document) {
-        throw new Error('Document not found');
+        throw new Error("Document not found");
       }
 
       // TODO: Later we'll also delete from ChromaDB here
-      console.log(`Would delete ChromaDB collection: ${document.chroma_collection_id}`);
+      console.log(
+        `Would delete ChromaDB collection: ${document.chroma_collection_id}`
+      );
 
       await document.destroy();
       console.log(`Document deleted: ${documentId}`);
 
       return {
         success: true,
-        message: 'Document deleted successfully'
+        message: "Document deleted successfully",
       };
     } catch (error) {
-      console.error('Delete document error:', error);
+      console.error("Delete document error:", error);
       throw new Error(`Failed to delete document: ${error.message}`);
     }
   }
@@ -175,32 +201,32 @@ class DocumentService {
   async getProcessingStatus(documentId, userId) {
     try {
       const document = await db.Document.findOne({
-        where: { 
-          id: documentId, 
-          user_id: userId 
+        where: {
+          id: documentId,
+          user_id: userId,
         },
         attributes: [
-          'id', 
-          'original_filename',
-          'processing_status', 
-          'processing_error',
-          'total_pages',
-          'chunk_count',
-          'processed_at'
-        ]
+          "id",
+          "original_filename",
+          "processing_status",
+          "processing_error",
+          "total_pages",
+          "chunk_count",
+          "processed_at",
+        ],
       });
 
       if (!document) {
-        throw new Error('Document not found');
+        throw new Error("Document not found");
       }
 
       return {
         success: true,
         status: document.processing_status,
-        document: document
+        document: document,
       };
     } catch (error) {
-      console.error('Get processing status error:', error);
+      console.error("Get processing status error:", error);
       throw new Error(`Failed to get processing status: ${error.message}`);
     }
   }

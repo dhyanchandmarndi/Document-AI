@@ -1,4 +1,4 @@
-export class ParagraphChunker {
+class ParagraphChunker {
   constructor(options = {}) {
     // Core configuration
     this.maxTokens = options.maxTokens || 1000;
@@ -363,3 +363,5 @@ export class ParagraphChunker {
     return Math.ceil(text.length / 4);
   }
 }
+
+module.exports = { ParagraphChunker };

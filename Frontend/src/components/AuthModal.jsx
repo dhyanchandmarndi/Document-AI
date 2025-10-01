@@ -1,43 +1,47 @@
 // components/AuthModal.jsx
-import React, { useState } from 'react';
+import React, { useState } from "react";
 
 const AuthModal = ({ onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: ''
+    name: "",
+    email: "",
+    password: "",
   });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
     // Clear error when user starts typing
-    if (error) setError('');
+    if (error) setError("");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
-      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const payload = isLogin 
+      const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
+      const payload = isLogin
         ? { email: formData.email, password: formData.password }
-        : { name: formData.name, email: formData.email, password: formData.password };
+        : {
+            name: formData.name,
+            email: formData.email,
+            password: formData.password,
+          };
 
       const response = await fetch(`http://localhost:5000${endpoint}`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -49,15 +53,15 @@ const AuthModal = ({ onLogin }) => {
         } else {
           // Registration successful, switch to login
           setIsLogin(true);
-          setFormData({ name: '', email: formData.email, password: '' });
-          setError('Account created successfully! Please login.');
+          setFormData({ name: "", email: formData.email, password: "" });
+          setError("Account created successfully! Please login.");
         }
       } else {
-        setError(data.message || 'Authentication failed');
+        setError(data.message || "Authentication failed");
       }
     } catch (error) {
-      console.error('Auth error:', error);
-      setError('Network error. Please check if the server is running.');
+      console.error("Auth error:", error);
+      setError("Network error. Please check if the server is running.");
     } finally {
       setLoading(false);
     }
@@ -65,8 +69,8 @@ const AuthModal = ({ onLogin }) => {
 
   const toggleMode = () => {
     setIsLogin(!isLogin);
-    setFormData({ name: '', email: '', password: '' });
-    setError('');
+    setFormData({ name: "", email: "", password: "" });
+    setError("");
   };
 
   return (
@@ -81,20 +85,27 @@ const AuthModal = ({ onLogin }) => {
               </div>
             </div>
             <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-              Document<span className="bg-gradient-to-r from-cyan-400 to-cyan-500 bg-clip-text text-transparent">AI</span>
+              Document
+              <span className="bg-gradient-to-r from-cyan-400 to-cyan-500 bg-clip-text text-transparent">
+                AI
+              </span>
             </h1>
             <p className="text-gray-400 text-sm mt-2">
-              {isLogin ? 'Welcome back! Please sign in to continue.' : 'Create your account to get started.'}
+              {isLogin
+                ? "Welcome back! Please sign in to continue."
+                : "Create your account to get started."}
             </p>
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className={`mb-4 p-3 rounded-lg text-sm ${
-              error.includes('successful') 
-                ? 'bg-green-500/10 border border-green-500/20 text-green-400'
-                : 'bg-red-500/10 border border-red-500/20 text-red-400'
-            }`}>
+            <div
+              className={`mb-4 p-3 rounded-lg text-sm ${
+                error.includes("successful")
+                  ? "bg-green-500/10 border border-green-500/20 text-green-400"
+                  : "bg-red-500/10 border border-red-500/20 text-red-400"
+              }`}
+            >
               {error}
             </div>
           )}
@@ -104,7 +115,10 @@ const AuthModal = ({ onLogin }) => {
             {/* Name field (only for registration) */}
             {!isLogin && (
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
+                <label
+                  htmlFor="name"
+                  className="block text-sm font-medium text-gray-300 mb-2"
+                >
                   Full Name
                 </label>
                 <input
@@ -122,7 +136,10 @@ const AuthModal = ({ onLogin }) => {
 
             {/* Email field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-300 mb-2"
+              >
                 Email Address
               </label>
               <input
@@ -139,7 +156,10 @@ const AuthModal = ({ onLogin }) => {
 
             {/* Password field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-300 mb-2"
+              >
                 Password
               </label>
               <input
@@ -151,7 +171,11 @@ const AuthModal = ({ onLogin }) => {
                 required
                 minLength="6"
                 className="w-full px-4 py-3 bg-[#333333] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-colors"
-                placeholder={isLogin ? "Enter your password" : "Create a password (min. 6 characters)"}
+                placeholder={
+                  isLogin
+                    ? "Enter your password"
+                    : "Create a password (min. 6 characters)"
+                }
               />
             </div>
 
@@ -164,10 +188,12 @@ const AuthModal = ({ onLogin }) => {
               {loading ? (
                 <div className="flex items-center justify-center">
                   <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2"></div>
-                  {isLogin ? 'Signing In...' : 'Creating Account...'}
+                  {isLogin ? "Signing In..." : "Creating Account..."}
                 </div>
+              ) : isLogin ? (
+                "Sign In"
               ) : (
-                isLogin ? 'Sign In' : 'Create Account'
+                "Create Account"
               )}
             </button>
           </form>
@@ -177,14 +203,16 @@ const AuthModal = ({ onLogin }) => {
         <div className="px-6 py-4 border-t border-gray-700/50 bg-[#222222]/50">
           <div className="text-center">
             <span className="text-gray-400 text-sm">
-              {isLogin ? "Don't have an account? " : "Already have an account? "}
+              {isLogin
+                ? "Don't have an account? "
+                : "Already have an account? "}
             </span>
             <button
               onClick={toggleMode}
               disabled={loading}
               className="text-cyan-400 hover:text-cyan-300 font-medium text-sm transition-colors disabled:opacity-50"
             >
-              {isLogin ? 'Sign Up' : 'Sign In'}
+              {isLogin ? "Sign Up" : "Sign In"}
             </button>
           </div>
         </div>
