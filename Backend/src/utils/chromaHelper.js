@@ -47,17 +47,23 @@ class ChromaHelper {
   }
 
   // Query method
-  async queryCollection(collectionName, queryText, nResults = 5) {
+  async queryCollection(collectionName, queryText, options = {}) {
     try {
       const collection = await this.client.getCollection({
         name: collectionName,
       });
 
-      const results = await collection.query({
-        queryTexts: [queryText], // ChromaDB will embed this automatically
-        nResults: nResults,
-      });
+      const queryParams = {
+        queryTexts: [queryText],
+        nResults: options.nResults || 5,
+      };
+      if (options.documentIds && options.documentIds.length > 0) {
+        queryParams.where = {
+          documentId: { $in: options.documentIds }
+        };
+      }
 
+      const results = await collection.query(queryParams);
       return results;
     } catch (error) {
       console.error("ChromaDB query error:", error);

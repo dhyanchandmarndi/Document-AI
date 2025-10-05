@@ -53,7 +53,7 @@ class DocumentService {
       console.log(`Created ${chunkCount} chunks`);
 
       // 5. Store in ChromaDB (ChromaDB will generate embeddings automatically)
-      const chromaCollectionId = `doc_${document.id}_chunks`;
+      const chromaCollectionId = `user_${userId}_documents`;
       await chromaHelper.storeInChromaDB(chromaCollectionId, chunks);
       console.log(
         `Stored ${chunkCount} chunks in ChromaDB collection: ${chromaCollectionId}`
