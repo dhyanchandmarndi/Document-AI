@@ -1,104 +1,81 @@
-const { ChromaClient } = require("chromadb");
+// src/services/queryService.js
+const { db } = require('../models');
+const ChromaHelper = require('../utils/chromaHelper');
+
+const chromaHelper = new ChromaHelper();
 
 class QueryService {
-  constructor() {
-    this.client = new ChromaClient({
-      path: process.env.CHROMADB_URL || "http://localhost:8000",
-    });
-    this.collectionName = process.env.CHROMA_COLLECTION_NAME || "documents";
-  }
-
-  /**
-   * Retrieve relevant document chunks based on user query
-   * @param {string} query - User's question
-   * @param {number} topK - Number of relevant chunks to retrieve
-   * @returns {Array} - Array of relevant document chunks with metadata
-   */
-  async retrieveRelevantChunks(query, topK = 5) {
+  async executeQuery(userId, queryText, documentIds = null) {
     try {
-      const collection = await this.client.getCollection({
-        name: this.collectionName,
+      console.log(`Executing query for user ${userId}`);
+      
+      // Get user's ChromaDB collection
+      const collectionName = `user_${userId}_documents`;
+      
+      // Query ChromaDB for relevant chunks
+      console.log(`Querying ChromaDB collection: ${collectionName}`);
+      const chromaResults = await chromaHelper.queryCollection(collectionName, queryText, {
+        documentIds: documentIds,
+        nResults: 5
       });
 
-      // Perform similarity search using ChromaDB's default embedding
-      const results = await collection.query({
-        queryTexts: [query],
-        nResults: topK,
-      });
+      // Process results
+      const processedResults = await this.processQueryResults(chromaResults, userId);
 
-      // Format results for easier consumption
-      const relevantChunks = results.documents[0].map((doc, index) => ({
-        content: doc,
-        metadata: results.metadatas[0][index],
-        distance: results.distances[0][index],
-        id: results.ids[0][index],
-      }));
+      console.log(`Found ${processedResults.totalResults} relevant chunks`);
 
-      return relevantChunks;
+      return processedResults;
+
     } catch (error) {
-      console.error("Error retrieving chunks:", error);
-      throw new Error(
-        "Failed to retrieve relevant chunks from vector database"
-      );
+      console.error('Query execution error:', error);
+      throw new Error(`Query execution failed: ${error.message}`);
     }
   }
 
-  /**
-   * Filter chunks by similarity threshold
-   * @param {Array} chunks - Retrieved chunks
-   * @param {number} threshold - Minimum similarity score (lower distance = higher similarity)
-   * @returns {Array} - Filtered chunks
-   */
-  filterByThreshold(chunks, threshold = 0.7) {
-    // ChromaDB returns distances (lower is better)
-    // Convert to similarity score if needed
-    return chunks.filter((chunk) => chunk.distance <= threshold);
-  }
-
-  /**
-   * Build context from retrieved chunks
-   * @param {Array} chunks - Relevant document chunks
-   * @returns {string} - Formatted context string
-   */
-  buildContext(chunks) {
-    if (!chunks || chunks.length === 0) {
-      return "";
-    }
-
-    const contextParts = chunks.map((chunk, index) => {
-      const metadata = chunk.metadata || {};
-      const source = metadata.filename || metadata.source || "Unknown";
-      const page = metadata.page ? ` (Page ${metadata.page})` : "";
-
-      return `[Source ${index + 1}: ${source}${page}]\n${chunk.content}`;
-    });
-
-    return contextParts.join("\n\n---\n\n");
-  }
-
-  /**
-   * Retrieve chunks by document ID
-   * @param {string} documentId - Document identifier
-   * @returns {Array} - All chunks for the document
-   */
-  async getChunksByDocumentId(documentId) {
+  async processQueryResults(chromaResults, userId) {
     try {
-      const collection = await this.client.getCollection({
-        name: this.collectionName,
-      });
+      if (!chromaResults.documents || !chromaResults.documents[0] || chromaResults.documents[0].length === 0) {
+        return {
+          chunks: [],
+          sources: [],
+          totalResults: 0
+        };
+      }
 
-      const results = await collection.get({
-        where: { documentId: documentId },
-      });
+      const documents = chromaResults.documents[0];
+      const metadatas = chromaResults.metadatas[0];
+      const distances = chromaResults.distances[0];
 
-      return results.documents.map((doc, index) => ({
-        content: doc,
-        metadata: results.metadatas[index],
-        id: results.ids[index],
+      // Process chunks
+      const chunks = documents.map((text, index) => ({
+        text: text,
+        similarity: Math.round((1 - distances[index]) * 100) / 100,
+        documentId: metadatas[index].documentId,
+        filename: metadatas[index].filename,
+        chunkIndex: metadatas[index].chunkIndex,
+        tokens: metadatas[index].tokens
       }));
+
+      // Get unique sources
+      const uniqueDocIds = [...new Set(chunks.map(chunk => chunk.documentId))];
+      const sources = uniqueDocIds.map(docId => {
+        const chunksFromDoc = chunks.filter(chunk => chunk.documentId === docId);
+        return {
+          documentId: docId,
+          filename: chunksFromDoc[0].filename,
+          chunksFound: chunksFromDoc.length
+        };
+      });
+
+      return {
+        chunks: chunks,
+        sources: sources,
+        totalResults: chunks.length
+      };
+
     } catch (error) {
-      console.error("Error retrieving chunks by document ID:", error);
-      throw new Error("Failed to retrieve chunks for document");
+      console.error('Process query results error:', error);
+      throw new Error(`Failed to process query results: ${error.message}`);
     }
   }
 }

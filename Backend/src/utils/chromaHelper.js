@@ -13,6 +13,7 @@ class ChromaHelper {
       const collection = await this.client.getOrCreateCollection({
         name: collectionName,
         metadata: { "hnsw:space": "cosine" },
+        embeddingFunction: undefined
       });
 
       // Prepare data - ChromaDB will generate embeddings automatically
