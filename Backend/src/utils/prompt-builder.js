@@ -44,33 +44,58 @@ Answer:`;
    * @returns {string} Formatted context
    */
   static buildContext(chunks, maxLength, includeMetadata) {
-    let context = "";
-    let currentLength = 0;
+  let context = "";
+  let currentLength = 0;
 
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      let chunkText = "";
+  if (!chunks || !Array.isArray(chunks) || chunks.length === 0) {
+    return "No relevant context found.";
+  }
 
-      if (includeMetadata && chunk.metadata) {
-        const metadataStr = this.formatMetadata(chunk.metadata, i + 1);
-        chunkText = `${metadataStr}\n${chunk.content}`;
-      } else {
-        chunkText = chunk.content;
-      }
-
-      const chunkLength = chunkText.length;
-
-      // Check if adding this chunk would exceed max length
-      if (currentLength + chunkLength > maxLength) {
-        break;
-      }
-
-      context += `\n\n--- Chunk ${i + 1} ---\n${chunkText}`;
-      currentLength += chunkLength;
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    
+    if (!chunk) {
+      console.warn(`Chunk at index ${i} is null/undefined, skipping`);
+      continue;
     }
 
-    return context || "No relevant context found.";
+    let chunkText = "";
+
+    const chunkContent = chunk.text || chunk.content || "";
+    
+    if (!chunkContent) {
+      console.warn(`Chunk ${i} has no text content, skipping`);
+      continue;
+    }
+
+    if (includeMetadata) {
+      const metadata = {
+        chunkIndex: chunk.chunkIndex ?? i,
+        documentId: chunk.documentId ?? "Unknown",
+        fileName: chunk.filename ?? chunk.fileName ?? "Unknown",
+        tokens: chunk.tokens ?? chunkContent.length,
+        similarity: chunk.similarity
+      };
+      
+      const metadataStr = this.formatMetadata(metadata, i + 1);
+      chunkText = `${metadataStr}\n${chunkContent}`;
+    } else {
+      chunkText = chunkContent;
+    }
+
+    const chunkLength = chunkText.length;
+
+    // Check if adding this chunk would exceed max length
+    if (currentLength + chunkLength > maxLength) {
+      break;
+    }
+
+    context += `\n\n--- Chunk ${i + 1} ---\n${chunkText}`;
+    currentLength += chunkLength;
   }
+
+  return context || "No relevant context found.";
+}
 
   /**
    * Format metadata for a chunk
@@ -99,6 +124,10 @@ Answer:`;
 
     if (metadata.tokens) {
       parts.push(`Tokens: ${metadata.tokens}`);
+    }
+
+    if (metadata.similarity !== undefined) {
+      parts.push(`Similarity: ${(metadata.similarity * 100).toFixed(1)}%`);
     }
 
     return parts.join(" | ");
@@ -191,7 +220,7 @@ Answer:`;
       id: index + 1,
       chunkIndex: chunk.chunkIndex || index,
       documentId: chunk.documentId || chunk.metadata?.documentId || "Unknown",
-      fileName: chunk.metadata?.fileName || "Unknown",
+      fileName: chunk.metadata?.filename || "Unknown",
       page: chunk.metadata?.page || chunk.metadata?.pageNumber || "N/A",
       relevanceScore: chunk.score ? chunk.score.toFixed(4) : "N/A",
       preview: chunk.content.substring(0, 100) + "...", // First 100 chars as preview
@@ -205,7 +234,7 @@ Answer:`;
    * @returns {string} Summarization prompt
    */
   static buildSummarizationPrompt(chunks, summaryType = "brief") {
-    const content = chunks.map((chunk) => chunk.content).join("\n\n");
+    const content = chunks.map((chunk) => chunk.text || chunk.content).join("\n\n");
 
     const summaryInstructions = {
       brief: "Provide a brief summary (2-3 paragraphs) of the main points.",

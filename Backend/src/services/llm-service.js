@@ -1,264 +1,88 @@
-const axios = require("axios");
+// src/services/LLMService.js using Google Gemini API
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const PromptBuilder = require("../utils/prompt-builder");
 
 class LLMService {
   constructor() {
-    this.provider = process.env.LLM_PROVIDER || "openai";
-    this.apiKey = process.env.LLM_API_KEY;
-    this.model = process.env.LLM_MODEL || "gpt-3.5-turbo";
-    this.baseURL = this.getBaseURL();
+    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    this.model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
   }
 
-  /**
-   * Get base URL based on provider
-   */
-  getBaseURL() {
-    const urls = {
-      openai: "https://api.openai.com/v1",
-      ollama: process.env.OLLAMA_URL || "http://localhost:11434",
-      anthropic: "https://api.anthropic.com/v1",
-    };
-    return urls[this.provider] || urls.openai;
-  }
-
-  /**
-   * Generate answer using LLM based on complete prompt
-   * @param {string} prompt - Complete prompt (already built with context and query)
-   * @param {Object} options - Additional generation options
-   * @returns {Object} LLM response
-   */
-  async generateAnswer(prompt, options = {}) {
+  async generateResponse(query, chunks, options = {}) {
     try {
-      const response = await this.callLLM(prompt, options);
+      const {
+        instructionTemplate = "default",
+        maxContextLength = 8000,
+        temperature = 0.7,
+        maxOutputTokens = 8192
+      } = options;
+
+      console.log(`Generating AI response for query: "${query}"`);
+      
+      if (!chunks || !Array.isArray(chunks)) {
+        throw new Error(`Invalid chunks data: ${typeof chunks}`);
+      }
+
+      console.log(`Received ${chunks.length} chunks`);
+      
+      if (chunks.length > 0) {
+        console.log("First chunk:", JSON.stringify(chunks[0], null, 2));
+      }
+
+      const validChunks = chunks.filter(chunk => {
+        if (!chunk) {
+          console.warn("Found null/undefined chunk, skipping");
+          return false;
+        }
+        if (!chunk.text && !chunk.content) {
+          console.warn("Found chunk without text/content, skipping");
+          return false;
+        }
+        return true;
+      });
+
+      console.log(`Using ${validChunks.length} valid chunks`);
+
+      if (validChunks.length === 0) {
+        throw new Error("No valid chunks available for AI generation");
+      }
+
+      // Build prompt using PromptBuilder
+      const prompt = PromptBuilder.buildRAGPrompt(query, validChunks, {
+        includeMetadata: true,
+        maxContextLength,
+        instructionTemplate
+      });
+
+      console.log(`Prompt built (${prompt.length} characters)`);
+      // console.log(`Prompt Preview: ${prompt}...`);
+
+      // Generate response with Gemini
+      const result = await this.model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: temperature,
+          maxOutputTokens: maxOutputTokens,
+          topK: 40,
+          topP: 0.95,
+        }
+      });
+
+      const response = result.response;
+      const answer = response.text();
+
+      console.log(`AI response generated (${answer.length} characters)`);
+
       return {
-        answer: response.content,
-        model: this.model,
-        provider: this.provider,
-        tokensUsed: response.tokensUsed,
+        answer: answer,
+        sourcesUsed: validChunks.length,
+        model: "gemini-2.5-flash"
       };
+
     } catch (error) {
-      console.error("Error generating answer:", error);
-      throw new Error("Failed to generate answer from LLM");
+      console.error("LLM generation error:", error);
+      throw new Error(`Failed to generate AI response: ${error.message}`);
     }
-  }
-
-  /**
-   * Call LLM API based on provider
-   * @param {string} prompt - Complete prompt to send
-   * @param {Object} options - Generation options
-   * @returns {Object} Parsed response
-   */
-  async callLLM(prompt, options) {
-    switch (this.provider) {
-      case "openai":
-        return await this.callOpenAI(prompt, options);
-      case "ollama":
-        return await this.callOllama(prompt, options);
-      case "anthropic":
-        return await this.callAnthropic(prompt, options);
-      default:
-        throw new Error(`Unsupported LLM provider: ${this.provider}`);
-    }
-  }
-
-  /**
-   * Call OpenAI API
-   */
-  async callOpenAI(prompt, options) {
-    const response = await axios.post(
-      `${this.baseURL}/chat/completions`,
-      {
-        model: this.model,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: options.temperature || 0.7,
-        max_tokens: options.maxTokens || 1000,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    return {
-      content: response.data.choices[0].message.content,
-      tokensUsed: response.data.usage.total_tokens,
-    };
-  }
-
-  /**
-   * Call Ollama API (local LLM)
-   */
-  async callOllama(prompt, options) {
-    const response = await axios.post(`${this.baseURL}/api/generate`, {
-      model: this.model,
-      prompt: prompt,
-      stream: false,
-      options: {
-        temperature: options.temperature || 0.7,
-        num_predict: options.maxTokens || 1000,
-      },
-    });
-
-    return {
-      content: response.data.response,
-      tokensUsed: response.data.eval_count || 0,
-    };
-  }
-
-  /**
-   * Call Anthropic API
-   */
-  async callAnthropic(prompt, options) {
-    const response = await axios.post(
-      `${this.baseURL}/messages`,
-      {
-        model: this.model,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        max_tokens: options.maxTokens || 1000,
-        temperature: options.temperature || 0.7,
-      },
-      {
-        headers: {
-          "x-api-key": this.apiKey,
-          "anthropic-version": "2023-06-01",
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    return {
-      content: response.data.content[0].text,
-      tokensUsed:
-        response.data.usage.input_tokens + response.data.usage.output_tokens,
-    };
-  }
-
-  /**
-   * Stream answer generation (for real-time responses)
-   * @param {string} prompt - Complete prompt
-   * @param {Object} options - Generation options
-   * @param {Function} onChunk - Callback for each chunk
-   */
-  async streamAnswer(prompt, options = {}, onChunk) {
-    if (this.provider !== "openai" && this.provider !== "ollama") {
-      throw new Error("Streaming not supported for this provider");
-    }
-
-    try {
-      if (this.provider === "openai") {
-        return await this.streamOpenAI(prompt, options, onChunk);
-      } else if (this.provider === "ollama") {
-        return await this.streamOllama(prompt, options, onChunk);
-      }
-    } catch (error) {
-      console.error("Error streaming answer:", error);
-      throw new Error("Failed to stream answer");
-    }
-  }
-
-  /**
-   * Stream from OpenAI
-   */
-  async streamOpenAI(prompt, options, onChunk) {
-    const response = await axios.post(
-      `${this.baseURL}/chat/completions`,
-      {
-        model: this.model,
-        messages: [{ role: "user", content: prompt }],
-        temperature: options.temperature || 0.7,
-        max_tokens: options.maxTokens || 1000,
-        stream: true,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        responseType: "stream",
-      }
-    );
-
-    return new Promise((resolve, reject) => {
-      let fullContent = "";
-
-      response.data.on("data", (chunk) => {
-        const lines = chunk
-          .toString()
-          .split("\n")
-          .filter((line) => line.trim() !== "");
-        for (const line of lines) {
-          if (line.includes("[DONE]")) {
-            resolve({ content: fullContent });
-            return;
-          }
-          try {
-            const json = JSON.parse(line.replace("data: ", ""));
-            const content = json.choices[0]?.delta?.content || "";
-            if (content) {
-              fullContent += content;
-              onChunk(content);
-            }
-          } catch (e) {
-            // Skip invalid JSON
-          }
-        }
-      });
-
-      response.data.on("error", reject);
-    });
-  }
-
-  /**
-   * Stream from Ollama
-   */
-  async streamOllama(prompt, options, onChunk) {
-    const response = await axios.post(
-      `${this.baseURL}/api/generate`,
-      {
-        model: this.model,
-        prompt: prompt,
-        stream: true,
-        options: {
-          temperature: options.temperature || 0.7,
-          num_predict: options.maxTokens || 1000,
-        },
-      },
-      {
-        responseType: "stream",
-      }
-    );
-
-    return new Promise((resolve, reject) => {
-      let fullContent = "";
-
-      response.data.on("data", (chunk) => {
-        try {
-          const json = JSON.parse(chunk.toString());
-          if (json.response) {
-            fullContent += json.response;
-            onChunk(json.response);
-          }
-          if (json.done) {
-            resolve({ content: fullContent });
-          }
-        } catch (e) {
-          // Skip invalid JSON
-        }
-      });
-
-      response.data.on("error", reject);
-    });
   }
 }
 

@@ -34,7 +34,8 @@ class QueryService {
 
   async processQueryResults(chromaResults, userId) {
     try {
-      if (!chromaResults.documents || !chromaResults.documents[0] || chromaResults.documents[0].length === 0) {
+      if (!chromaResults || !chromaResults.documents || !chromaResults.documents[0]) {
+        console.log('No results returned from ChromaDB');
         return {
           chunks: [],
           sources: [],
@@ -43,6 +44,16 @@ class QueryService {
       }
 
       const documents = chromaResults.documents[0];
+      
+      if (!documents || documents.length === 0) {
+        console.log('Empty documents array from ChromaDB');
+        return {
+          chunks: [],
+          sources: [],
+          totalResults: 0
+        };
+      }
+
       const metadatas = chromaResults.metadatas[0];
       const distances = chromaResults.distances[0];
 

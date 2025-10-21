@@ -50,8 +50,9 @@ class ChromaHelper {
   // Query method
   async queryCollection(collectionName, queryText, options = {}) {
     try {
-      const collection = await this.client.getCollection({
+      const collection = await this.client.getOrCreateCollection({
         name: collectionName,
+        embeddingFunction: undefined
       });
 
       const queryParams = {
