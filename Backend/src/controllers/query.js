@@ -21,7 +21,7 @@ class QueryController {
         aiResponse = await LLMService.generateResponse(
           query, 
           retrievalResults.chunks,
-          { instructionTemplate: "citation" }
+          { instructionTemplate: "default" }
         );
         console.log('AI Answer:', aiResponse.answer);
       } else if (useAI && retrievalResults.chunks.length === 0) {

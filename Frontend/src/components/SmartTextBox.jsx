@@ -1,6 +1,7 @@
-// components/SmartTextBox.jsx - Updated with backend integration
+// components/SmartTextBox.jsx - Updated with query integration
 import React, { useState, useRef, useEffect } from "react";
 import useDocumentUpload from "../hooks/useDocumentUpload";
+import useQueryDocument from "../hooks/useQueryDocument";
 
 const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents...", isMobile = false }) => {
   const [text, setText] = useState("");
@@ -9,8 +10,9 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // Add document upload hook
-  const { uploadDocument, uploading, error: uploadError, setError } = useDocumentUpload();
+  // Add hooks
+  const { uploadDocument, uploading, error: uploadError, setError: setUploadError } = useDocumentUpload();
+  const { sendQuery, querying, error: queryError, setError: setQueryError } = useQueryDocument();
 
   const autoResize = () => {
     const textarea = textareaRef.current;
@@ -38,11 +40,41 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
     }
   };
 
-  const handleSend = () => {
-    if ((text.trim() || files.length > 0) && !uploading) { // Prevent send while uploading
+  const handleSend = async () => {
+    if (text.trim() && !uploading && !querying) {
+      const userMessage = {
+        text: text.trim(),
+        files: files.map(f => ({
+          name: f.name,
+          documentId: f.documentId,
+          pages: f.pages,
+          chunks: f.chunks
+        }))
+      };
+
+      // Extract document IDs from uploaded files
+      const documentIds = files
+        .filter(f => f.uploaded && f.documentId)
+        .map(f => f.documentId);
+
+      // Call parent onSend to display user message
       if (onSend) {
-        onSend({ text: text.trim(), files });
+        onSend(userMessage, async () => {
+          // This callback will be called after user message is displayed
+          // Send query to backend if there's text
+          if (text.trim()) {
+            try {
+              const result = await sendQuery(text.trim(), documentIds, true);
+              return result; // Return AI response to parent
+            } catch (error) {
+              console.error('Query failed:', error);
+              return { error: true, message: error.message };
+            }
+          }
+        });
       }
+
+      // Clear input
       setText("");
       setFiles([]);
       if (textareaRef.current) {
@@ -51,19 +83,15 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
     }
   };
 
-  // Modified file handling with backend upload
   const handleFileSelect = async (e) => {
     const selectedFiles = Array.from(e.target.files);
-    setError(null); // Clear any previous errors
+    setUploadError(null);
     
     for (const file of selectedFiles) {
-      // Only process PDF files for backend upload
       if (file.type === 'application/pdf') {
         try {
-          // Upload to backend
           const result = await uploadDocument(file);
           
-          // Add uploaded file with backend data
           const uploadedFile = {
             name: result.document.original_filename,
             size: file.size,
@@ -71,15 +99,14 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
             pages: result.document.total_pages,
             chunks: result.document.chunk_count,
             documentId: result.document.id,
-            uploaded: true, // Mark as uploaded
-            backendData: result.document // Store full backend response
+            uploaded: true,
+            backendData: result.document
           };
           
           setFiles(prev => [...prev, uploadedFile]);
           
         } catch (error) {
           console.error('Upload failed:', error);
-          // Add failed file with error state
           const failedFile = {
             name: file.name,
             size: file.size,
@@ -90,7 +117,6 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
           setFiles(prev => [...prev, failedFile]);
         }
       } else {
-        // For non-PDF files, add normally (no upload)
         setFiles(prev => [...prev, file]);
       }
     }
@@ -103,14 +129,15 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
   };
 
   const triggerFileInput = () => {
-    if (!uploading) { // Prevent file selection while uploading
+    if (!uploading && !querying) {
       fileInputRef.current?.click();
     }
   };
 
+  const isProcessing = uploading || querying;
+
   return (
     <div className="w-full">
-      {/* Custom scrollbar styles */}
       <style jsx>{`
         .custom-scrollbar {
           scrollbar-width: thin;
@@ -135,26 +162,18 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: #5a6478;
         }
-        
-        .custom-scrollbar::-webkit-scrollbar-button {
-          display: none;
-        }
-        
-        .custom-scrollbar::-webkit-scrollbar-corner {
-          background: transparent;
-        }
       `}</style>
 
-      {/* Upload error display */}
-      {uploadError && (
+      {/* Error displays */}
+      {(uploadError || queryError) && (
         <div className={`bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 ${
           isMobile ? 'mb-3 p-3 text-xs' : 'mb-3 p-3 text-sm'
         }`}>
-          {uploadError}
+          {uploadError || queryError}
         </div>
       )}
 
-      {/* File preview area - Enhanced with upload status */}
+      {/* File preview area */}
       {files.length > 0 && (
         <div className={`bg-[#2a2a2a]/60 backdrop-blur-sm rounded-xl border border-gray-700/50 ${
           isMobile ? 'mb-3 p-3' : 'mb-3 p-3 sm:p-4'
@@ -171,7 +190,6 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
                 className={`flex items-center rounded-lg hover:bg-[#3a3a3a]/60 transition-all duration-200 ${
                   isMobile ? 'px-3 py-1.5 text-xs' : 'px-3 py-1.5 text-xs sm:text-sm'
                 } ${
-                  // Different colors based on upload status
                   file.error 
                     ? 'bg-red-500/10 border border-red-500/20' 
                     : file.uploaded 
@@ -182,7 +200,6 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
                 <svg className={`mr-2 ${
                   isMobile ? 'w-3 h-3' : 'w-3.5 h-3.5'
                 } ${
-                  // Icon color based on status
                   file.error 
                     ? 'text-red-400/80' 
                     : file.uploaded 
@@ -194,7 +211,6 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
                 <span className={`mr-2 truncate ${
                   isMobile ? 'max-w-24' : 'max-w-32 sm:max-w-48'
                 } ${
-                  // Text color based on status
                   file.error 
                     ? 'text-red-300' 
                     : file.uploaded 
@@ -203,13 +219,11 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
                 }`}>
                   {file.name}
                 </span>
-                {/* Show upload info for PDFs */}
                 {file.uploaded && file.pages && (
                   <span className="text-green-500/70 text-xs mr-2">
                     ({file.pages}p, {file.chunks}c)
                   </span>
                 )}
-                {/* Show error indicator */}
                 {file.error && (
                   <span className="text-red-500/70 text-xs mr-2">
                     (failed)
@@ -234,16 +248,16 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
         </div>
       )}
 
-      {/* Main input container - Same styling, enhanced functionality */}
+      {/* Main input container */}
       <div className={`relative bg-[#2a2a2a]/40 backdrop-blur-sm border rounded-xl transition-all duration-300 ${
         isFocused 
           ? 'border-gray-500/60 shadow-sm shadow-gray-500/10' 
           : 'border-gray-700/50 hover:border-gray-600/60'
       } ${isMobile ? 'rounded-xl' : 'rounded-xl sm:rounded-2xl'} ${
-        uploading ? 'opacity-75' : '' // Visual feedback while uploading
+        isProcessing ? 'opacity-75' : ''
       }`}>
         <div className="flex flex-col">
-          {/* Main text area */}
+          {/* Text area */}
           <div className={`flex-1 ${
             isMobile ? 'px-4 pt-3 pb-1' : 'px-4 sm:px-5 pt-3 pb-1'
           }`}>
@@ -254,12 +268,16 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
               onKeyDown={handleKeyDown}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder={uploading ? "Processing PDF document..." : placeholder} // Dynamic placeholder
+              placeholder={
+                uploading ? "Processing PDF document..." : 
+                querying ? "Querying documents..." :
+                placeholder
+              }
               rows={1}
-              disabled={uploading} // Disable while uploading
+              disabled={querying}
               className={`custom-scrollbar w-full bg-transparent text-white placeholder-gray-500 border-none outline-none resize-none leading-6 ${
                 isMobile ? 'text-base' : 'text-base sm:text-lg'
-              } ${uploading ? 'cursor-not-allowed' : ''}`}
+              } ${querying ? 'cursor-not-allowed' : ''}`}
               style={{ 
                 height: isMobile ? "48px" : "44px",
                 minHeight: isMobile ? "48px" : "44px",
@@ -276,18 +294,21 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
             <div className={`flex items-center ${
               isMobile ? 'space-x-3' : 'space-x-2'
             }`}>
-              {/* Attach button - Enhanced with upload state */}
+              {/* Attach button */}
               <button 
                 onClick={triggerFileInput}
-                disabled={uploading} // Disable while uploading
+                disabled={isProcessing}
                 className={`text-gray-500 hover:text-gray-300 hover:bg-gray-700/30 rounded-lg transition-all duration-200 ${
                   isMobile ? 'p-3' : 'p-2.5'
-                } ${uploading ? 'cursor-not-allowed opacity-50' : ''}`}
-                title={uploading ? "Processing..." : "Attach files"}
+                } ${isProcessing ? 'cursor-not-allowed opacity-50' : ''}`}
+                title={uploading ? "Processing..." : querying ? "Querying..." : "Attach files"}
               >
-                {/* Show spinner while uploading */}
                 {uploading ? (
                   <div className={`border-2 border-cyan-500 border-t-transparent rounded-full animate-spin ${
+                    isMobile ? 'w-6 h-6' : 'w-5 h-5'
+                  }`}></div>
+                ) : querying ? (
+                  <div className={`border-2 border-purple-500 border-t-transparent rounded-full animate-spin ${
                     isMobile ? 'w-6 h-6' : 'w-5 h-5'
                   }`}></div>
                 ) : (
@@ -299,7 +320,7 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
                 )}
               </button>
 
-              {/* File count indicator - Enhanced */}
+              {/* File count indicator */}
               {files.length > 0 && (
                 <span className={`text-cyan-400/80 bg-cyan-400/10 rounded-full ${
                   isMobile ? 'text-sm px-3 py-1' : 'text-xs px-2 py-0.5'
@@ -309,12 +330,12 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
               )}
             </div>
 
-            {/* Send button - Enhanced */}
+            {/* Send button */}
             <button 
               onClick={handleSend}
-              disabled={(!text.trim() && files.length === 0) || uploading} // Disable while uploading
+              disabled={!text.trim() || uploading || querying}
               className={`rounded-lg transition-all duration-200 ${
-                ((!text.trim() && files.length === 0) || uploading)
+                ((!text.trim() && files.length === 0) || isProcessing)
                   ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
                   : 'bg-cyan-500/90 hover:bg-cyan-500 text-white shadow-sm hover:shadow-md'
               } ${isMobile ? 'p-3' : 'p-2'}`}
@@ -329,19 +350,18 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
           </div>
         </div>
 
-        {/* Hidden file input - Modified to only accept PDFs for backend upload */}
         <input
           ref={fileInputRef}
           type="file"
           multiple
           onChange={handleFileSelect}
           className="hidden"
-          accept=".pdf" // Keep same file types
-          disabled={uploading}
+          accept=".pdf"
+          disabled={isProcessing}
         />
       </div>
 
-      {/* Helper text - Enhanced with upload status */}
+      {/* Helper text */}
       <div className={`text-center ${
         isMobile ? 'mt-2 text-xs' : 'mt-2 text-xs sm:text-sm'
       }`}>
@@ -350,10 +370,14 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
             <div className="w-3 h-3 border border-yellow-400 border-t-transparent rounded-full animate-spin mr-2"></div>
             Processing PDF document...
           </span>
+        ) : querying ? (
+          <span className="text-purple-400 flex items-center justify-center">
+            <div className="w-3 h-3 border border-purple-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+            Querying documents with AI...
+          </span>
         ) : (
           <span className="text-gray-600">
             Press <kbd className="bg-gray-800/50 px-1.5 py-0.5 rounded text-xs border border-gray-700">↵</kbd> to send • <kbd className="bg-gray-800/50 px-1.5 py-0.5 rounded text-xs border border-gray-700">⇧↵</kbd> for new line
-            {/* Add PDF upload hint */}
             <span className="block mt-1 text-gray-700">
               PDF files are automatically processed for AI chat
             </span>
