@@ -339,9 +339,25 @@ class ParagraphChunker {
   }
 
   _packageResults(chunks, metadata, processingInfo) {
+    const documentId = metadata.documentId; // Get documentId
+    
     return chunks.map((chunk, index) => ({
-      ...chunk,
+      // Make ID unique by prepending documentId
+      id: `${documentId}_${chunk.id}`,
+      
+      // Keep everything else as-is
+      text: chunk.text,
+      tokens: chunk.tokens,
+      originalTokens: chunk.originalTokens,
+      overlap: chunk.overlap,
+      metadata: chunk.metadata,
       chunkIndex: index,
+      
+      // Add these at top level (NEW)
+      documentId: metadata.documentId,
+      filename: metadata.filename,
+      userId: metadata.userId,
+      
       globalMetadata: {
         ...metadata,
         strategy: "paragraph",
@@ -350,8 +366,8 @@ class ParagraphChunker {
       navigation: {
         isFirst: index === 0,
         isLast: index === chunks.length - 1,
-        previousChunk: index > 0 ? chunks[index - 1].id : null,
-        nextChunk: index < chunks.length - 1 ? chunks[index + 1].id : null,
+        previousChunk: index > 0 ? `${documentId}_${chunks[index - 1].id}` : null,
+        nextChunk: index < chunks.length - 1 ? `${documentId}_${chunks[index + 1].id}` : null,
       },
     }));
   }

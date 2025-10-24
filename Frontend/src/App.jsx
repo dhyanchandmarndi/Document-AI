@@ -1,8 +1,9 @@
-// App.jsx
-import React, { useState, useEffect } from "react";
+// App.jsx - Updated with query integration
+import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "./components/Sidebar";
 import MainContent from "./components/MainContent";
 import AuthModal from "./components/AuthModal";
+import { jwtDecode } from 'jwt-decode';
 
 export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -13,6 +14,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authToken, setAuthToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
     const token = localStorage.getItem('authToken');
@@ -20,13 +22,24 @@ export default function App() {
     
     if (token && userData) {
       try {
-        setAuthToken(token);
-        setUser(JSON.parse(userData));
-        setIsAuthenticated(true);
+        const decoded = jwtDecode(token);
+        const currentTime = Date.now() / 1000;
+        
+        if (decoded.exp < currentTime) {
+          console.log('Token expired, please login again');
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('userData');
+          setIsAuthenticated(false);
+        } else {
+          setAuthToken(token);
+          setUser(JSON.parse(userData));
+          setIsAuthenticated(true);
+        }
       } catch (error) {
-        console.error('Error parsing stored user data:', error);
+        console.error('Error validating token:', error);
         localStorage.removeItem('authToken');
         localStorage.removeItem('userData');
+        setIsAuthenticated(false);
       }
     }
     setLoading(false);
@@ -51,22 +64,77 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, [isMobile]);
 
+  // Auto-scroll when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
-  const handleSend = ({ text, files }) => {
+  // Updated handleSend to support async query callback
+  const handleSend = async (userMessage, queryCallback) => {
+    // Create user message
     const newMessage = {
       id: Date.now(),
-      text,
-      files,
-      timestamp: new Date()
+      text: userMessage.text,
+      files: userMessage.files,
+      timestamp: new Date(),
+      aiResponse: null,
+      error: false,
+      errorMessage: null,
+      isLoading: false // Track loading state for this message
     };
+    
+    // Add user message to state immediately
     setMessages(prev => [...prev, newMessage]);
     
     // Auto-close sidebar on mobile after sending message
     if (isMobile && !sidebarCollapsed) {
       setSidebarCollapsed(true);
+    }
+
+    // If there's a query callback (meaning text was sent), execute it
+    if (queryCallback) {
+      // Set loading state for this message
+      setMessages(prev => prev.map(msg => 
+        msg.id === newMessage.id 
+          ? { ...msg, isLoading: true }
+          : msg
+      ));
+
+      try {
+        // Execute the query callback to get AI response
+        const aiResponse = await queryCallback();
+        
+        // Update message with AI response using functional update to avoid stale state
+        setMessages(prev => prev.map(msg => 
+          msg.id === newMessage.id 
+            ? { 
+                ...msg, 
+                aiResponse: aiResponse,
+                isLoading: false,
+                error: aiResponse.error || false,
+                errorMessage: aiResponse.error ? aiResponse.message : null
+              }
+            : msg
+        ));
+      } catch (error) {
+        console.error('Query execution error:', error);
+        
+        // Update message with error state
+        setMessages(prev => prev.map(msg => 
+          msg.id === newMessage.id 
+            ? { 
+                ...msg, 
+                isLoading: false,
+                error: true,
+                errorMessage: error.message || 'Failed to process query'
+              }
+            : msg
+        ));
+      }
     }
   };
 
@@ -140,6 +208,7 @@ export default function App() {
               isMobile={isMobile}
               onToggleSidebar={toggleSidebar}
               user={user}
+              messagesEndRef={messagesEndRef}
             />
           </div>
         </>

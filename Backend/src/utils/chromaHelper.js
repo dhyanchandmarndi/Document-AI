@@ -9,35 +9,43 @@ class ChromaHelper {
 
   async storeInChromaDB(collectionName, chunksData) {
     try {
-      // Get or create collection with default embedding function
       const collection = await this.client.getOrCreateCollection({
         name: collectionName,
         metadata: { "hnsw:space": "cosine" },
+        embeddingFunction: undefined
       });
 
-      // Prepare data - ChromaDB will generate embeddings automatically
       const ids = chunksData.map((item) => item.id);
       const documents = chunksData.map((item) => item.text);
-      const metadatas = chunksData.map((item) => ({
-        chunkIndex: item.chunkIndex,
-        tokens: item.tokens,
-        originalIndex: item.metadata?.originalIndex,
-        isSplit: item.metadata?.isSplit || false,
-        isCombined: item.metadata?.isCombined || false,
-        ...item.globalMetadata,
-        navigation: JSON.stringify(item.navigation),
-      }));
+      
+      // FIX: Set explicit fields AFTER spreading globalMetadata
+      const metadatas = chunksData.map((item) => {
+        const documentId = item.documentId || item.globalMetadata?.documentId;
+        const filename = item.filename || item.globalMetadata?.filename;
+        const userId = item.userId || item.globalMetadata?.userId;
+        
+        return {
+          ...item.globalMetadata,  // Spread first
+          // Then override with explicit values (so they don't get overwritten)
+          documentId: documentId,
+          filename: filename,
+          userId: userId,
+          chunkIndex: item.chunkIndex,
+          tokens: item.tokens,
+          originalIndex: item.metadata?.originalIndex,
+          isSplit: item.metadata?.isSplit || false,
+          isCombined: item.metadata?.isCombined || false,
+          navigation: JSON.stringify(item.navigation),
+        };
+      });
 
-      // Add to collection - ChromaDB generates embeddings
       await collection.add({
         ids: ids,
         documents: documents,
         metadatas: metadatas,
       });
 
-      console.log(
-        `Successfully stored ${ids.length} chunks in collection ${collectionName}`
-      );
+      console.log(`Successfully stored ${ids.length} chunks in collection ${collectionName}`);
 
       return { success: true, count: ids.length };
     } catch (error) {
@@ -47,17 +55,24 @@ class ChromaHelper {
   }
 
   // Query method
-  async queryCollection(collectionName, queryText, nResults = 5) {
+  async queryCollection(collectionName, queryText, options = {}) {
     try {
-      const collection = await this.client.getCollection({
+      const collection = await this.client.getOrCreateCollection({
         name: collectionName,
+        embeddingFunction: undefined
       });
 
-      const results = await collection.query({
-        queryTexts: [queryText], // ChromaDB will embed this automatically
-        nResults: nResults,
-      });
+      const queryParams = {
+        queryTexts: [queryText],
+        nResults: options.nResults || 5,
+      };
+      if (options.documentIds && options.documentIds.length > 0) {
+        queryParams.where = {
+          documentId: { $in: options.documentIds }
+        };
+      }
 
+      const results = await collection.query(queryParams);
       return results;
     } catch (error) {
       console.error("ChromaDB query error:", error);
