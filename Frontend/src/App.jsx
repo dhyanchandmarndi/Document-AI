@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "./components/Sidebar";
 import MainContent from "./components/MainContent";
 import AuthModal from "./components/AuthModal";
+import { jwtDecode } from 'jwt-decode';
 
 export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -21,13 +22,24 @@ export default function App() {
     
     if (token && userData) {
       try {
-        setAuthToken(token);
-        setUser(JSON.parse(userData));
-        setIsAuthenticated(true);
+        const decoded = jwtDecode(token);
+        const currentTime = Date.now() / 1000;
+        
+        if (decoded.exp < currentTime) {
+          console.log('Token expired, please login again');
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('userData');
+          setIsAuthenticated(false);
+        } else {
+          setAuthToken(token);
+          setUser(JSON.parse(userData));
+          setIsAuthenticated(true);
+        }
       } catch (error) {
-        console.error('Error parsing stored user data:', error);
+        console.error('Error validating token:', error);
         localStorage.removeItem('authToken');
         localStorage.removeItem('userData');
+        setIsAuthenticated(false);
       }
     }
     setLoading(false);
