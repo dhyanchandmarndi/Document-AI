@@ -78,10 +78,51 @@ class ChatService {
         throw new Error('Conversation not found');
       }
 
-      return {
-        success: true,
-        conversation: conversation
-      };
+      // ADD: Fetch document details for each message
+    const conversationData = conversation.toJSON();
+    
+    // Get all unique document IDs from all messages
+    const allDocumentIds = new Set();
+    conversationData.messages.forEach(msg => {
+      if (msg.document_ids && Array.isArray(msg.document_ids)) {
+        msg.document_ids.forEach(id => allDocumentIds.add(id));
+      }
+    });
+
+    // Fetch all documents at once (efficient)
+    let documentsMap = {};
+    if (allDocumentIds.size > 0) {
+      const documents = await db.Document.findAll({
+        where: {
+          id: Array.from(allDocumentIds),
+          user_id: userId
+        },
+        attributes: ['id', 'original_filename', 'total_pages', 'chunk_count']
+      });
+
+      // Create a map for quick lookup
+      documents.forEach(doc => {
+        documentsMap[doc.id] = {
+          id: doc.id,
+          name: doc.original_filename,
+          pages: doc.total_pages,
+          chunks: doc.chunk_count
+        };
+      });
+    }
+
+    // Attach document details to each message
+    conversationData.messages = conversationData.messages.map(msg => ({
+      ...msg,
+      documents: msg.document_ids 
+        ? msg.document_ids.map(id => documentsMap[id]).filter(Boolean)
+        : []
+    }));
+
+    return {
+      success: true,
+      conversation: conversationData
+    };
     } catch (error) {
       throw new Error(`Failed to get conversation: ${error.message}`);
     }

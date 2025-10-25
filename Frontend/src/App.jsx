@@ -199,7 +199,7 @@ export default function App() {
         const loadedMessages = conversationData.messages.map(msg => ({
           id: msg.id,
           text: msg.query_text,
-          files: msg.document_ids ? msg.document_ids.map(id => ({ documentId: id })) : [],
+          files: msg.documents || [],
           timestamp: new Date(msg.created_at),
           aiResponse: msg.ai_response ? {
             answer: msg.ai_response,
