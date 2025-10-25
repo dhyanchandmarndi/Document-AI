@@ -10,7 +10,8 @@ require("dotenv").config();
 const { testConnection } = require("./models");
 const userRoutes = require("./routes/user");
 const documentRoutes = require("./routes/document");
-const queryRoutes = require("./routes/query"); // New import
+const queryRoutes = require("./routes/query");
+const chatRoutes = require('./routes/chatRoutes');
 
 const PORT = process.env.PORT || 8000;
 const app = express();
@@ -45,7 +46,8 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // Routes
 app.use("/api/auth", userRoutes);
 app.use("/api/documents", documentRoutes);
-app.use("/api/query", queryRoutes); // New route
+app.use("/api/query", queryRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

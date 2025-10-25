@@ -65,8 +65,10 @@ const testConnection = async () => {
 };
 
 // Import models
-const User = require('./User')(sequelize, Sequelize.DataTypes);
+const User = require('./user')(sequelize, Sequelize.DataTypes);
 const Document = require('./document')(sequelize, Sequelize.DataTypes);
+const Conversation = require('./conversation')(sequelize, Sequelize.DataTypes);
+const Message = require('./message')(sequelize, Sequelize.DataTypes); 
 
 // Define associations
 User.hasMany(Document, { 
@@ -75,9 +77,43 @@ User.hasMany(Document, {
   onDelete: 'CASCADE'
 });
 
+User.hasMany(Conversation, {
+  foreignKey: 'user_id',
+  as: 'conversations',
+  onDelete: 'CASCADE'
+});
+
+User.hasMany(Message, {
+  foreignKey: 'user_id',
+  as: 'messages',
+  onDelete: 'CASCADE'
+});
+
 Document.belongsTo(User, { 
   foreignKey: 'user_id', 
   as: 'user'
+});
+
+Conversation.belongsTo(User, {
+  foreignKey: 'user_id',
+  as: 'user'
+});
+
+Conversation.hasMany(Message, {
+  foreignKey: 'conversation_id',
+  as: 'messages',
+  onDelete: 'CASCADE'
+});
+
+// Message associations
+Message.belongsTo(User, {
+  foreignKey: 'user_id',
+  as: 'user'
+});
+
+Message.belongsTo(Conversation, {
+  foreignKey: 'conversation_id',
+  as: 'conversation'
 });
 
 // Export everything
@@ -85,7 +121,9 @@ const db = {
   sequelize,
   Sequelize,
   User,
-  Document // ✅ Export Document model
+  Document, // ✅ Export Document model
+  Conversation, // ✅ Add this
+  Message 
 };
 
 module.exports = {

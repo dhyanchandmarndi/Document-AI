@@ -59,12 +59,12 @@ const SmartTextBox = ({ onSend, placeholder = "Ask anything about your documents
 
       // Call parent onSend to display user message
       if (onSend) {
-        onSend(userMessage, async () => {
+        onSend(userMessage, async (conversationId) => {
           // This callback will be called after user message is displayed
           // Send query to backend if there's text
           if (text.trim()) {
             try {
-              const result = await sendQuery(text.trim(), documentIds, true);
+              const result = await sendQuery(text.trim(), documentIds, true, conversationId);
               return result; // Return AI response to parent
             } catch (error) {
               console.error('Query failed:', error);

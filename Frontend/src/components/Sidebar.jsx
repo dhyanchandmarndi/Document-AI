@@ -1,18 +1,34 @@
 // components/Sidebar.jsx
 import React, { useState, useRef, useEffect } from "react";
+import useConversations from "../hooks/useConversations";
+import ConfirmModal from "./ConfirmModal";
 
-const Sidebar = ({ collapsed, onToggle, onNewChat, isMobile, user, onLogout }) => {
+const Sidebar = ({ 
+  collapsed, 
+  onToggle, 
+  onNewChat, 
+  isMobile, 
+  user, 
+  onLogout,
+  currentConversationId,  // NEW: Track active conversation
+  onSelectConversation,    // NEW: Handle conversation selection
+  onMountRefresh        // NEW: Pass refresh function to parent
+}) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const userMenuRef = useRef(null);
 
-  // Sample chat history
-  const chatHistory = [
-    "Financial Report Analysis Q3 2024",
-    "Marketing Campaign Performance Review",
-    "Project Proposal Risk Assessment",
-    "Customer Feedback Summary Document",
-    "Quarterly Sales Data Analysis",
-  ];
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, conversationId: null, title: '' });
+
+  // Use conversations hook
+  const { conversations, loading, error, fetchConversations, deleteConversation } = useConversations();
+
+  // Fetch conversations on mount
+  useEffect(() => {
+    if (user) {
+      fetchConversations();
+    }
+  }, [user]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -27,6 +43,13 @@ const Sidebar = ({ collapsed, onToggle, onNewChat, isMobile, user, onLogout }) =
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+  
+  // Provide fetchConversations to parent on mount
+  useEffect(() => {
+    if (onMountRefresh) {
+      onMountRefresh(fetchConversations);
+    }
+  }, [onMountRefresh, fetchConversations]);
 
   // Handle user menu toggle
   const toggleUserMenu = () => {
@@ -39,17 +62,69 @@ const Sidebar = ({ collapsed, onToggle, onNewChat, isMobile, user, onLogout }) =
     onLogout();
   };
 
+  const handleDeleteConversation = (e, conversation) => {
+    e.stopPropagation();
+    setDeleteConfirm({
+      isOpen: true,
+      conversationId: conversation.id,
+      title: conversation.title
+    });
+  };
+
+  // ✅ ADD: Confirm delete action
+  const confirmDelete = async () => {
+    const conversationId = deleteConfirm.conversationId;
+    setDeleteConfirm({ isOpen: false, conversationId: null, title: '' });
+    
+    setDeletingId(conversationId);
+    try {
+      await deleteConversation(conversationId);
+      
+      if (conversationId === currentConversationId) {
+        onNewChat();
+      }
+    } catch (error) {
+      alert('Failed to delete conversation');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirm({ isOpen: false, conversationId: null, title: '' });
+  };
+
+  const handleSelectConversation = (conversation) => {
+    if (onSelectConversation) {
+      onSelectConversation(conversation);
+    }
+    
+    // Close sidebar on mobile after selection
+    if (isMobile && !collapsed) {
+      onToggle();
+    }
+  };
+
   return (
     <>
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Conversation?"
+        message={`Are you sure you want to delete "${deleteConfirm.title}"? This action cannot be undone.`}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
       {/* Fixed Sidebar */}
       <div className={`fixed left-0 top-0 h-screen bg-[#222222] border-r border-gray-700 z-30 transition-all duration-300 ${
         isMobile 
-          ? `w-80 ${collapsed ? '-translate-x-full' : 'translate-x-0'}` // Mobile: slide in/out
-          : `${collapsed ? 'w-16' : 'w-64'}` // Desktop: collapse/expand
+          ? `w-80 ${collapsed ? '-translate-x-full' : 'translate-x-0'}`
+          : `${collapsed ? 'w-16' : 'w-64'}`
       }`}>
         <div className="flex flex-col h-full">
           
-          {/* Header Section - Fixed at top */}
+          {/* Header Section */}
           <div className="flex-shrink-0 p-4 border-b border-gray-700/50">
             <div className={`flex items-center ${
               collapsed && !isMobile ? 'justify-center' : 'justify-between'
@@ -106,30 +181,72 @@ const Sidebar = ({ collapsed, onToggle, onNewChat, isMobile, user, onLogout }) =
             )}
             
             <div className="flex-1 overflow-y-auto sidebar-scroll">
-              <div className="p-2 space-y-1">
-                {chatHistory.map((chat, index) => (
-                  <button
-                    key={index}
-                    className={`w-full text-left p-3 text-sm text-gray-400 hover:bg-gray-800/60 rounded-lg transition-all duration-200 hover:text-gray-200 group ${
-                      collapsed && !isMobile ? 'px-2' : 'px-3'
-                    }`}
-                    title={collapsed && !isMobile ? chat : ""}
-                  >
-                    <div className={`flex items-center ${
-                      collapsed && !isMobile ? 'justify-center' : ''
-                    }`}>
-                      <svg className="w-4 h-4 text-gray-500 group-hover:text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.955 8.955 0 01-2.646-.388l-2.729 1.093a.5.5 0 01-.67-.65L8.051 17.95A8 8 0 1121 12z" />
-                      </svg>
-                      {(!collapsed || isMobile) && (
-                        <span className="ml-3 truncate leading-5">
-                          {chat}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
+              {loading && (!collapsed || isMobile) ? (
+                <div className="flex items-center justify-center p-8">
+                  <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : error ? (
+                <div className="p-4 text-center text-red-400 text-sm">
+                  {error}
+                </div>
+              ) : conversations.length === 0 ? (
+                (!collapsed || isMobile) && (
+                  <div className="p-4 text-center text-gray-500 text-sm">
+                    No conversations yet
+                  </div>
+                )
+              ) : (
+                <div className="p-2 space-y-1">
+                  {conversations.map((conversation) => (
+                    <button
+                      key={conversation.id}
+                      onClick={() => handleSelectConversation(conversation)}
+                      className={`w-full text-left p-3 text-sm rounded-lg transition-all duration-200 group relative ${
+                        conversation.id === currentConversationId
+                          ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                          : 'text-gray-400 hover:bg-gray-800/60 hover:text-gray-200'
+                      } ${collapsed && !isMobile ? 'px-2' : 'px-3'}`}
+                      title={collapsed && !isMobile ? conversation.title : ""}
+                      disabled={deletingId === conversation.id}
+                    >
+                      <div className={`flex items-center ${
+                        collapsed && !isMobile ? 'justify-center' : 'justify-between'
+                      }`}>
+                        <div className="flex items-center min-w-0 flex-1">
+                          <svg className={`flex-shrink-0 ${
+                            conversation.id === currentConversationId ? 'text-cyan-400' : 'text-gray-500 group-hover:text-gray-300'
+                          } ${collapsed && !isMobile ? 'w-5 h-5' : 'w-4 h-4'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.955 8.955 0 01-2.646-.388l-2.729 1.093a.5.5 0 01-.67-.65L8.051 17.95A8 8 0 1121 12z" />
+                          </svg>
+                          {(!collapsed || isMobile) && (
+                            <span className="ml-3 truncate leading-5 flex-1">
+                              {conversation.title}
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Delete button */}
+                        {(!collapsed || isMobile) && (
+                          <button
+                            onClick={(e) => handleDeleteConversation(e, conversation)}
+                            className="ml-2 p-1 opacity-0 group-hover:opacity-100 hover:bg-red-500/20 rounded transition-all"
+                            title="Delete conversation"
+                            disabled={deletingId === conversation.id}
+                          >
+                            {deletingId === conversation.id ? (
+                              <div className="w-4 h-4 border border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
