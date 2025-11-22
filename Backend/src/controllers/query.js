@@ -2,6 +2,7 @@
 const queryService = require('../services/query-service');
 const LLMService = require('../services/llm-service');
 const chatService = require('../services/chatService');
+const contextResolutionService = require('../services/contextResolutionService');
 
 class QueryController {
   async processQuery(req, res) {
@@ -15,23 +16,80 @@ class QueryController {
 
       let messageId = null;
 
+      const contextResolution = await contextResolutionService.resolveDocumentContext(
+        userId,
+        query,
+        documentIds,
+        conversationId
+      );
+
+      const resolvedDocumentIds = contextResolution.documentIds;
+      console.log('Context resolution:', contextResolution);
+
+      let chatHistory = [];
+      if (conversationId) {
+        try {
+          chatHistory = await chatService.getRecentMessages(conversationId, userId, 5);
+          console.log(`Chat history: ${chatHistory.length} messages loaded`);
+        } catch (error) {
+          console.error('Failed to load chat history:', error);
+          // Continue without history on error
+        }
+      }
+
       // Step 1: Create message in conversation if conversationId provided
       if (conversationId) {
         try {
           const messageResult = await chatService.createMessage(conversationId, userId, {
             queryText: query,
-            documentIds: documentIds || []
+            documentIds: resolvedDocumentIds
           });
           messageId = messageResult.message.id;
           console.log(`Message created in conversation: ${messageId}`);
         } catch (error) {
           console.error('Failed to save message to conversation:', error);
-          // Continue processing even if saving fails
         }
       }
 
+      if (resolvedDocumentIds.length === 0) {
+        console.log('No documents available - handling general query');
+        
+        let response;
+        
+        if (useAI) {
+          // Option A: Return helpful message
+          response = {
+            success: true,
+            query: query,
+            answer: "I don't have any documents to reference for this question. Please upload a document first, or your question will be answered based on general knowledge without document context.",
+            retrieval: {
+              chunks: [],
+              sources: [],
+              totalResults: 0,
+              processingTime: 0
+            },
+            ai: {
+              model: 'system',
+              sourcesUsed: 0
+            },
+            contextInfo: {
+              ...contextResolution,
+              message: 'No documents available in context'
+            }
+          };
+        } else {
+          response = {
+            success: false,
+            message: 'No documents available. Please upload a document or reference a previous one.',
+            contextInfo: contextResolution
+          };
+        }
+
+        return res.json(response);
+      }
+
       // Step 2: Get relevant chunks
-      const retrievalResults = await queryService.executeQuery(userId, query, documentIds);
+      const retrievalResults = await queryService.executeQuery(userId, query, resolvedDocumentIds);
 
       let aiResponse = null;
       if (useAI && retrievalResults.chunks && retrievalResults.chunks.length > 0) {
@@ -39,7 +97,7 @@ class QueryController {
         aiResponse = await LLMService.generateResponse(
           query, 
           retrievalResults.chunks,
-          { instructionTemplate: "default" }
+          { instructionTemplate: "default", chatHistory: chatHistory }
         );
         console.log('AI Answer:', aiResponse.answer);
 
@@ -88,7 +146,9 @@ class QueryController {
           model: aiResponse.model,
           // response: aiResponse.answer || "No response",
           sourcesUsed: aiResponse.sourcesUsed
-        } : null
+        } : null,
+        contextInfo: contextResolution,
+        chatHistoryUsed: chatHistory.length
       });
 
     } catch (error) {

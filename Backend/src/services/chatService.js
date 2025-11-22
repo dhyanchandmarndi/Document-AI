@@ -307,6 +307,53 @@ class ChatService {
       throw new Error(`Failed to get messages: ${error.message}`);
     }
   }
+  async getRecentMessages(conversationId, userId, limit = 5) {
+    try {
+      // Fetch recent messages from database
+      const messages = await db.Message.findAll({
+        where: {
+          conversation_id: conversationId,
+          user_id: userId
+        },
+        attributes: ['query_text', 'ai_response', 'created_at'],
+        order: [['created_at', 'DESC']], // Most recent first
+        limit: limit
+      });
+
+      if (!messages || messages.length === 0) {
+        return [];
+      }
+
+      // Format chat history (reverse to get chronological order)
+      const formattedHistory = [];
+      
+      // Reverse to get oldest first (chronological order)
+      messages.reverse().forEach(msg => {
+        // Add user message
+        if (msg.query_text) {
+          formattedHistory.push({
+            role: 'user',
+            content: msg.query_text
+          });
+        }
+        
+        // Add assistant response
+        if (msg.ai_response) {
+          formattedHistory.push({
+            role: 'assistant',
+            content: msg.ai_response
+          });
+        }
+      });
+
+      console.log(`Retrieved ${formattedHistory.length} messages for conversation context`);
+      return formattedHistory;
+
+    } catch (error) {
+      console.error('Error getting recent messages:', error);
+      return []; // Return empty array on error (graceful fallback)
+    }
+  }
 
   // Helper: Generate conversation title from first query
   generateTitle(queryText) {

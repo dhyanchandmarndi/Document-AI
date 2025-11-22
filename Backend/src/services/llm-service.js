@@ -14,10 +14,12 @@ class LLMService {
         instructionTemplate = "default",
         maxContextLength = 8000,
         temperature = 0.7,
-        maxOutputTokens = 8192
+        maxOutputTokens = 8192,
+        chatHistory = []
       } = options;
 
       console.log(`Generating AI response for query: "${query}"`);
+      console.log(`Chat history: ${chatHistory.length} messages`);
       
       if (!chunks || !Array.isArray(chunks)) {
         throw new Error(`Invalid chunks data: ${typeof chunks}`);
@@ -47,12 +49,34 @@ class LLMService {
         throw new Error("No valid chunks available for AI generation");
       }
 
-      // Build prompt using PromptBuilder
-      const prompt = PromptBuilder.buildRAGPrompt(query, validChunks, {
-        includeMetadata: true,
-        maxContextLength,
-        instructionTemplate
-      });
+      let prompt;
+      
+      if (chatHistory && chatHistory.length > 0) {
+        // Use conversational prompt with chat history
+        prompt = PromptBuilder.buildConversationalPrompt(
+          query,
+          validChunks,
+          chatHistory,
+          {
+            includeMetadata: true,
+            maxContextLength,
+            instructionTemplate
+          }
+        );
+        console.log(`Built conversational prompt with ${chatHistory.length} history messages`);
+      } else {
+        // Use standard RAG prompt (no history)
+        prompt = PromptBuilder.buildRAGPrompt(
+          query,
+          validChunks,
+          {
+            includeMetadata: true,
+            maxContextLength,
+            instructionTemplate
+          }
+        );
+        console.log('Built standard RAG prompt (no history)');
+      }
 
       console.log(`Prompt built (${prompt.length} characters)`);
       // console.log(`Prompt Preview: ${prompt}...`);
@@ -75,7 +99,7 @@ class LLMService {
 
       return {
         answer: answer,
-        sourcesUsed: validChunks.length,
+        // sourcesUsed: validChunks.length,
         model: "gemini-2.5-flash"
       };
 
