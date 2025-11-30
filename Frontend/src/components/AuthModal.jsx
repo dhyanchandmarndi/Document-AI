@@ -79,11 +79,11 @@ const AuthModal = ({ onLogin }) => {
         {/* Header */}
         <div className="p-6 pb-4">
           <div className="text-center mb-6">
-            <div className="flex items-center justify-center mb-4">
+            {/* <div className="flex items-center justify-center mb-4">
               <div className="w-12 h-12 bg-gradient-to-r from-cyan-400 to-cyan-600 rounded-xl flex items-center justify-center">
                 <span className="text-white font-bold text-xl">D</span>
               </div>
-            </div>
+            </div> */}
             <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
               Document
               <span className="bg-gradient-to-r from-cyan-400 to-cyan-500 bg-clip-text text-transparent">

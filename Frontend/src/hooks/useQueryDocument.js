@@ -5,7 +5,7 @@ const useQueryDocument = () => {
   const [querying, setQuerying] = useState(false);
   const [error, setError] = useState(null);
 
-  const sendQuery = async (queryText, documentIds = [], useAI = true) => {
+  const sendQuery = async (queryText, documentIds = [], useAI = true, conversationId = null) => {
     setQuerying(true);
     setError(null);
 
@@ -24,7 +24,8 @@ const useQueryDocument = () => {
         body: JSON.stringify({
           query: queryText,
           documentIds: documentIds,
-          useAI: useAI
+          useAI: useAI,
+          conversationId: conversationId
         })
       });
 
@@ -35,13 +36,7 @@ const useQueryDocument = () => {
 
       const result = await response.json();
       
-      return {
-        success: true,
-        answer: result.answer,
-        retrieval: result.retrieval,
-        ai: result.ai,
-        query: result.query
-      };
+      return result;
 
     } catch (error) {
       console.error('Query error:', error);

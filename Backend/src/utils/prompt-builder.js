@@ -140,7 +140,15 @@ Answer:`;
    */
   static getInstructionTemplate(templateName) {
     const templates = {
-      default: `You are an intelligent assistant helping users understand documents. Use the context information below to answer the question accurately and concisely. If the context doesn't contain enough information to answer the question fully, acknowledge what you don't know and provide what information you can based on the context.`,
+      default: `You are an expert document analysis assistant. Your role is to help users understand their documents by:
+
+      1. Analyzing and explaining concepts clearly with reasoning
+      2. Synthesizing information rather than just copying text
+      3. Adding helpful context and explanations to aid understanding
+      4. Noting any inconsistencies or unclear information (like incorrect formulas)
+      5. Providing structured, well-organized responses
+
+      Important: Base your answers on the provided context, but add explanations and insights. If formulas or technical content appear incorrect or unclear, mention this to the user.`,
 
       strict: `You are an assistant that answers questions strictly based on the provided context. Only use information from the context below. If the context does not contain the answer, respond with "I cannot answer this question based on the provided documents."`,
 
