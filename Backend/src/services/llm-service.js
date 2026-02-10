@@ -4,8 +4,16 @@ const PromptBuilder = require("../utils/prompt-builder");
 
 class LLMService {
   constructor() {
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY is missing in environment variables");
+    }
+
     this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    this.model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    // Updated model → Gemini Flash 3 Preview
+    this.model = this.genAI.getGenerativeModel({
+      model: "gemini-3-flash-preview",
+    });
   }
 
   async generateResponse(query, chunks, options = {}) {
@@ -15,44 +23,26 @@ class LLMService {
         maxContextLength = 8000,
         temperature = 0.7,
         maxOutputTokens = 8192,
-        chatHistory = []
+        chatHistory = [],
       } = options;
 
-      console.log(`Generating AI response for query: "${query}"`);
-      console.log(`Chat history: ${chatHistory.length} messages`);
-      
       if (!chunks || !Array.isArray(chunks)) {
         throw new Error(`Invalid chunks data: ${typeof chunks}`);
       }
 
-      console.log(`Received ${chunks.length} chunks`);
-      
-      if (chunks.length > 0) {
-        console.log("First chunk:", JSON.stringify(chunks[0], null, 2));
-      }
-
-      const validChunks = chunks.filter(chunk => {
-        if (!chunk) {
-          console.warn("Found null/undefined chunk, skipping");
-          return false;
-        }
-        if (!chunk.text && !chunk.content) {
-          console.warn("Found chunk without text/content, skipping");
-          return false;
-        }
+      const validChunks = chunks.filter((chunk) => {
+        if (!chunk) return false;
+        if (!chunk.text && !chunk.content) return false;
         return true;
       });
-
-      console.log(`Using ${validChunks.length} valid chunks`);
 
       if (validChunks.length === 0) {
         throw new Error("No valid chunks available for AI generation");
       }
 
       let prompt;
-      
+
       if (chatHistory && chatHistory.length > 0) {
-        // Use conversational prompt with chat history
         prompt = PromptBuilder.buildConversationalPrompt(
           query,
           validChunks,
@@ -60,49 +50,33 @@ class LLMService {
           {
             includeMetadata: true,
             maxContextLength,
-            instructionTemplate
-          }
+            instructionTemplate,
+          },
         );
-        console.log(`Built conversational prompt with ${chatHistory.length} history messages`);
       } else {
-        // Use standard RAG prompt (no history)
-        prompt = PromptBuilder.buildRAGPrompt(
-          query,
-          validChunks,
-          {
-            includeMetadata: true,
-            maxContextLength,
-            instructionTemplate
-          }
-        );
-        console.log('Built standard RAG prompt (no history)');
+        prompt = PromptBuilder.buildRAGPrompt(query, validChunks, {
+          includeMetadata: true,
+          maxContextLength,
+          instructionTemplate,
+        });
       }
 
-      console.log(`Prompt built (${prompt.length} characters)`);
-      // console.log(`Prompt Preview: ${prompt}...`);
-
-      // Generate response with Gemini
       const result = await this.model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: temperature,
-          maxOutputTokens: maxOutputTokens,
+          temperature,
+          maxOutputTokens,
           topK: 40,
           topP: 0.95,
-        }
+        },
       });
 
-      const response = result.response;
-      const answer = response.text();
-
-      console.log(`AI response generated (${answer.length} characters)`);
+      const answer = result.response.text();
 
       return {
-        answer: answer,
-        // sourcesUsed: validChunks.length,
-        model: "gemini-2.5-flash"
+        answer,
+        model: "gemini-2.0-flash-preview",
       };
-
     } catch (error) {
       console.error("LLM generation error:", error);
       throw new Error(`Failed to generate AI response: ${error.message}`);
