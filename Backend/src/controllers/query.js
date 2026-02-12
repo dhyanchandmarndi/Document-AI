@@ -1,14 +1,20 @@
 // src/controllers/queryController.js
-const queryService = require('../services/query-service');
-const LLMService = require('../services/llm-service');
-const chatService = require('../services/chatService');
-const contextResolutionService = require('../services/contextResolutionService');
+const queryService = require("../services/query-service");
+const LLMService = require("../services/llm-service");
+const chatService = require("../services/chatService");
+const contextResolutionService = require("../services/contextResolutionService");
 
 class QueryController {
   async processQuery(req, res) {
     try {
       const userId = req.user.id;
-      const { query, documentIds, useAI = false, conversationId } = req.body;
+      const {
+        query,
+        documentIds,
+        useAI = false,
+        conversationId,
+        provider = "cloud",
+      } = req.body;
 
       console.log(`Processing query for user ${userId}: "${query}"`);
 
@@ -16,23 +22,28 @@ class QueryController {
 
       let messageId = null;
 
-      const contextResolution = await contextResolutionService.resolveDocumentContext(
-        userId,
-        query,
-        documentIds,
-        conversationId
-      );
+      const contextResolution =
+        await contextResolutionService.resolveDocumentContext(
+          userId,
+          query,
+          documentIds,
+          conversationId,
+        );
 
       const resolvedDocumentIds = contextResolution.documentIds;
-      console.log('Context resolution:', contextResolution);
+      console.log("Context resolution:", contextResolution);
 
       let chatHistory = [];
       if (conversationId) {
         try {
-          chatHistory = await chatService.getRecentMessages(conversationId, userId, 5);
+          chatHistory = await chatService.getRecentMessages(
+            conversationId,
+            userId,
+            5,
+          );
           console.log(`Chat history: ${chatHistory.length} messages loaded`);
         } catch (error) {
-          console.error('Failed to load chat history:', error);
+          console.error("Failed to load chat history:", error);
           // Continue without history on error
         }
       }
@@ -40,48 +51,54 @@ class QueryController {
       // Step 1: Create message in conversation if conversationId provided
       if (conversationId) {
         try {
-          const messageResult = await chatService.createMessage(conversationId, userId, {
-            queryText: query,
-            documentIds: resolvedDocumentIds
-          });
+          const messageResult = await chatService.createMessage(
+            conversationId,
+            userId,
+            {
+              queryText: query,
+              documentIds: resolvedDocumentIds,
+            },
+          );
           messageId = messageResult.message.id;
           console.log(`Message created in conversation: ${messageId}`);
         } catch (error) {
-          console.error('Failed to save message to conversation:', error);
+          console.error("Failed to save message to conversation:", error);
         }
       }
 
       if (resolvedDocumentIds.length === 0) {
-        console.log('No documents available - handling general query');
-        
+        console.log("No documents available - handling general query");
+
         let response;
-        
+
         if (useAI) {
           // Option A: Return helpful message
           response = {
             success: true,
             query: query,
-            answer: "I don't have any documents to reference for this question. Please upload a document first, or your question will be answered based on general knowledge without document context.",
+            answer:
+              "I don't have any documents to reference for this question. Please upload a document first, or your question will be answered based on general knowledge without document context.",
             retrieval: {
               chunks: [],
               sources: [],
               totalResults: 0,
-              processingTime: 0
+              processingTime: 0,
             },
             ai: {
-              model: 'system',
-              sourcesUsed: 0
+              model: "system",
+              sourcesUsed: 0,
             },
             contextInfo: {
               ...contextResolution,
-              message: 'No documents available in context'
-            }
+              message: "No documents available in context",
+            },
           };
         } else {
           response = {
             success: false,
-            message: 'No documents available. Please upload a document or reference a previous one.',
-            contextInfo: contextResolution
+            message:
+              "No documents available. Please upload a document or reference a previous one.",
+            contextInfo: contextResolution,
           };
         }
 
@@ -89,17 +106,29 @@ class QueryController {
       }
 
       // Step 2: Get relevant chunks
-      const retrievalResults = await queryService.executeQuery(userId, query, resolvedDocumentIds);
+      const retrievalResults = await queryService.executeQuery(
+        userId,
+        query,
+        resolvedDocumentIds,
+      );
 
       let aiResponse = null;
-      if (useAI && retrievalResults.chunks && retrievalResults.chunks.length > 0) {
-        console.log('Generating AI response...');
+      if (
+        useAI &&
+        retrievalResults.chunks &&
+        retrievalResults.chunks.length > 0
+      ) {
+        console.log("Generating AI response...");
         aiResponse = await LLMService.generateResponse(
-          query, 
+          query,
           retrievalResults.chunks,
-          { instructionTemplate: "default", chatHistory: chatHistory }
+          {
+            instructionTemplate: "default",
+            chatHistory: chatHistory,
+            provider,
+          },
         );
-        console.log('AI Answer:', aiResponse.answer);
+        console.log("AI Answer:", aiResponse.answer);
 
         // Step 3: Update message with AI response if it was saved
         if (messageId) {
@@ -108,21 +137,25 @@ class QueryController {
               aiResponse: aiResponse.answer,
               chunksUsed: retrievalResults.chunks.length,
               processingTime: (Date.now() - startTime) / 1000,
-              modelName: aiResponse.model
+              modelName: aiResponse.model,
             });
             console.log(`Message updated with AI response: ${messageId}`);
           } catch (error) {
-            console.error('Failed to update message with response:', error);
+            console.error("Failed to update message with response:", error);
             // Continue even if update fails
           }
         }
       } else if (useAI && retrievalResults.chunks.length === 0) {
-        console.log('No chunks available for AI generation');
+        console.log("No chunks available for AI generation");
         if (messageId) {
           try {
-            await chatService.markMessageAsError(messageId, userId, 'No relevant chunks found');
+            await chatService.markMessageAsError(
+              messageId,
+              userId,
+              "No relevant chunks found",
+            );
           } catch (error) {
-            console.error('Failed to mark message as error:', error);
+            console.error("Failed to mark message as error:", error);
           }
         }
       }
@@ -136,28 +169,32 @@ class QueryController {
         success: true,
         query: query,
         answer: aiResponse?.answer || null,
-        messageId: messageId, 
+        messageId: messageId,
         conversationId: conversationId,
         retrieval: {
           ...retrievalResults,
-          processingTime: processingTime
+          processingTime: processingTime,
         },
-        ai: aiResponse ? {
-          model: aiResponse.model,
-          // response: aiResponse.answer || "No response",
-          sourcesUsed: aiResponse.sourcesUsed
-        } : null,
+        ai: aiResponse
+          ? {
+              model: aiResponse.model,
+              // response: aiResponse.answer || "No response",
+              sourcesUsed: aiResponse.sourcesUsed,
+            }
+          : null,
         contextInfo: contextResolution,
-        chatHistoryUsed: chatHistory.length
+        chatHistoryUsed: chatHistory.length,
       });
-
     } catch (error) {
-      console.error('Query processing error:', error);
-      
+      console.error("Query processing error:", error);
+
       res.status(500).json({
         success: false,
-        message: 'Failed to process query',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'INTERNAL_ERROR'
+        message: "Failed to process query",
+        error:
+          process.env.NODE_ENV === "development"
+            ? error.message
+            : "INTERNAL_ERROR",
       });
     }
   }

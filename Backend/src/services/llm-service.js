@@ -1,5 +1,6 @@
 // src/services/LLMService.js using Google Gemini API
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const LocalLLMService = require("./local-llm.service");
 const PromptBuilder = require("../utils/prompt-builder");
 
 class LLMService {
@@ -24,6 +25,7 @@ class LLMService {
         temperature = 0.7,
         maxOutputTokens = 8192,
         chatHistory = [],
+        provider = "cloud", // NEW
       } = options;
 
       if (!chunks || !Array.isArray(chunks)) {
@@ -61,6 +63,18 @@ class LLMService {
         });
       }
 
+      // LOCAL MODEL PATH
+      if (provider === "local") {
+        const answer = await LocalLLMService.generateLocalResponse(prompt);
+
+        return {
+          answer,
+          model: "gemma2:2b (ollama)",
+          sourcesUsed: validChunks.length,
+        };
+      }
+
+      // CLOUD MODEL PATH (Gemini)
       const result = await this.model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
@@ -75,7 +89,7 @@ class LLMService {
 
       return {
         answer,
-        model: "gemini-2.0-flash-preview",
+        model: "gemini-3-flash-preview",
       };
     } catch (error) {
       console.error("LLM generation error:", error);
