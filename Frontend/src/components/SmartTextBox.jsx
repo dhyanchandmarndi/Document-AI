@@ -208,7 +208,7 @@ const SmartTextBox = ({
       {/* File preview area */}
       {files.length > 0 && (
         <div
-          className={`bg-[#2a2a2a]/60 backdrop-blur-sm rounded-xl border border-gray-700/50 ${
+          className={`bg-[#0a0a0a]/60 backdrop-blur-sm rounded-xl border border-gray-700/50 ${
             isMobile ? "mb-3 p-3" : "mb-3 p-3 sm:p-4"
           }`}
         >
@@ -300,7 +300,7 @@ const SmartTextBox = ({
 
       {/* Main input container */}
       <div
-        className={`relative bg-[#2a2a2a]/40 backdrop-blur-sm border rounded-xl transition-all duration-300 ${
+        className={`relative bg-[#0a0a0a]/40 backdrop-blur-sm border rounded-xl transition-all duration-300 ${
           isFocused
             ? "border-gray-500/60 shadow-sm shadow-gray-500/10"
             : "border-gray-700/50 hover:border-gray-600/60"
