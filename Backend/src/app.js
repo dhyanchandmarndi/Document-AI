@@ -11,7 +11,8 @@ const { testConnection } = require("./models");
 const userRoutes = require("./routes/user");
 const documentRoutes = require("./routes/document");
 const queryRoutes = require("./routes/query");
-const chatRoutes = require('./routes/chatRoutes');
+const chatRoutes = require("./routes/chatRoutes");
+const models = require("./routes/models");
 
 const PORT = process.env.PORT || 8000;
 const app = express();
@@ -24,7 +25,7 @@ app.use(
         ? ["https://yourdomain.com"]
         : ["http://localhost:5173"],
     credentials: true,
-  })
+  }),
 );
 
 // Middleware
@@ -47,7 +48,8 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use("/api/auth", userRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/query", queryRoutes);
-app.use('/api/chat', chatRoutes);
+app.use("/api/chat", chatRoutes);
+app.use("/api/models", models);
 
 // Health check
 app.get("/api/health", (req, res) => {
