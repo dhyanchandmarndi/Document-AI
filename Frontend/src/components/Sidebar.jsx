@@ -13,6 +13,8 @@ const Sidebar = ({
   currentConversationId, // NEW: Track active conversation
   onSelectConversation, // NEW: Handle conversation selection
   onMountRefresh, // NEW: Pass refresh function to parent
+  activeView, // NEW
+  onNavigate, // NEW — (viewName) => void
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
@@ -60,6 +62,18 @@ const Sidebar = ({
       onMountRefresh(fetchConversations);
     }
   }, [onMountRefresh, fetchConversations]);
+
+  // New Chat button handler — ensure it also switches view
+  const handleNewChat = () => {
+    onNewChat();
+    onNavigate("chat");
+  };
+
+  // Models nav item handler
+  const handleModelsClick = () => {
+    onNavigate("models");
+    if (isMobile && !collapsed) onToggle();
+  };
 
   // Handle user menu toggle
   const toggleUserMenu = () => {
@@ -212,6 +226,32 @@ const Sidebar = ({
               {(!collapsed || isMobile) && (
                 <span className="ml-2">New Chat</span>
               )}
+            </button>
+          </div>
+
+          {/* Models Button */}
+          <div className="flex-shrink-0 p-4">
+            <button
+              onClick={handleModelsClick}
+              className={`w-full flex items-center justify-center p-3 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-cyan-500/25 ${
+                collapsed && !isMobile ? "px-2" : "px-3"
+              }`}
+              title="Start new chat"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              {(!collapsed || isMobile) && <span className="ml-2">Models</span>}
             </button>
           </div>
 

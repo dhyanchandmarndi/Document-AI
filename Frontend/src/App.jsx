@@ -5,6 +5,7 @@ import Sidebar from "./components/Sidebar";
 import MainContent from "./components/MainContent";
 import AuthModal from "./components/AuthModal";
 import useConversations from "./hooks/useConversations";
+import ModelsManager from "./components/models/ModelsManager";
 
 export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -16,6 +17,8 @@ export default function App() {
   const [authToken, setAuthToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef(null);
+
+  const [activeView, setActiveView] = useState("chat"); // "chat" | "models"
 
   // NEW: Chat history state
   const [currentConversationId, setCurrentConversationId] = useState(null);
@@ -171,6 +174,8 @@ export default function App() {
       if (isMobile) {
         setSidebarCollapsed(true);
       }
+
+      setActiveView("chat"); // ensure switching back to chat view
     } catch (error) {
       console.error("Failed to create conversation:", error);
       // Fallback: just clear messages
@@ -279,6 +284,8 @@ export default function App() {
             onMountRefresh={(refreshFn) => {
               sidebarRefreshRef.current = refreshFn;
             }}
+            activeView={activeView} // ADD THIS
+            onNavigate={setActiveView}
           />
 
           <div
@@ -286,15 +293,19 @@ export default function App() {
               isMobile ? "ml-0" : sidebarCollapsed ? "ml-16" : "ml-64"
             }`}
           >
-            <MainContent
-              messages={messages}
-              onSend={handleSend}
-              sidebarCollapsed={sidebarCollapsed}
-              isMobile={isMobile}
-              onToggleSidebar={toggleSidebar}
-              user={user}
-              messagesEndRef={messagesEndRef}
-            />
+            {activeView === "chat" && (
+              <MainContent
+                messages={messages}
+                onSend={handleSend}
+                sidebarCollapsed={sidebarCollapsed}
+                isMobile={isMobile}
+                onToggleSidebar={toggleSidebar}
+                user={user}
+                messagesEndRef={messagesEndRef}
+              />
+            )}
+
+            {activeView === "models" && <ModelsManager isMobile={isMobile} />}
           </div>
         </>
       )}

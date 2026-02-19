@@ -33,8 +33,10 @@ const SmartTextBox = ({
     querying,
     error: queryError,
     setError: setQueryError,
-    provider,
-    setProvider,
+    selectedModel,
+    setSelectedModel,
+    availableModels,
+    modelsLoading,
   } = useQueryDocument();
 
   const autoResize = () => {
@@ -411,18 +413,46 @@ const SmartTextBox = ({
             </div>
 
             <div className="flex items-center">
-              {/* Drop-down list of models*/}
               <div className="relative inline-block text-xs m-3">
-                {/* Button */}
+                {/* Trigger button */}
                 <button
                   onClick={() => setOpen(!open)}
-                  className="inline-flex items-center justify-center bg-[#2a2a2a]/40 border border-gray-700 text-gray-200 rounded-full px-3 py-1 shadow-xs focus:outline-none"
+                  disabled={modelsLoading}
+                  className="inline-flex items-center justify-center bg-[#2a2a2a]/40 border border-gray-700 text-gray-200 rounded-full px-3 py-1 shadow-xs focus:outline-none disabled:opacity-50"
                   type="button"
                 >
-                  {provider === "cloud"
-                    ? "Gemini3 Flash (Cloud)"
-                    : "Gemma2 2B (Local)"}
-
+                  {modelsLoading ? (
+                    <span className="text-gray-400">Loading models...</span>
+                  ) : (
+                    <>
+                      {/* Colored dot indicating cloud vs local */}
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full mr-2 flex-shrink-0 ${
+                          availableModels.find((m) => m.id === selectedModel)
+                            ?.type === "cloud"
+                            ? "bg-cyan-400"
+                            : "bg-green-400"
+                        }`}
+                      />
+                      {availableModels.find((m) => m.id === selectedModel)
+                        ?.label ||
+                        selectedModel ||
+                        "Select model"}
+                      <span
+                        className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full ${
+                          availableModels.find((m) => m.id === selectedModel)
+                            ?.type === "cloud"
+                            ? "bg-cyan-500/20 text-cyan-400"
+                            : "bg-green-500/20 text-green-400"
+                        }`}
+                      >
+                        {availableModels.find((m) => m.id === selectedModel)
+                          ?.type === "cloud"
+                          ? "Cloud"
+                          : "Local"}
+                      </span>
+                    </>
+                  )}
                   <svg
                     className="w-3 h-3 ml-2"
                     xmlns="http://www.w3.org/2000/svg"
@@ -435,56 +465,120 @@ const SmartTextBox = ({
                 </button>
 
                 {/* Dropdown */}
-                {open && (
-                  <div className="absolute right-0 mt-2 bg-[#2a2a2a]/40 border border-gray-700 rounded-xl shadow-lg w-48 overflow-hidden z-10">
-                    <ul className="p-1 text-xs text-gray-200">
-                      <li>
-                        <button
-                          onClick={() => selectOption("cloud")}
-                          className="w-full text-left px-3 py-2 hover:bg-gray-700 rounded-md"
-                        >
-                          Gemini Flash (Cloud)
-                        </button>
-                      </li>
+                {open && !modelsLoading && (
+                  <div className="absolute right-0 mt-2 bg-[#1a1a1a] border border-gray-700 rounded-xl shadow-lg w-56 overflow-hidden z-10">
+                    {/* Cloud section */}
+                    {availableModels.filter((m) => m.type === "cloud").length >
+                      0 && (
+                      <>
+                        <div className="px-3 pt-2.5 pb-1 text-[10px] font-medium text-gray-500 uppercase tracking-wider">
+                          Cloud
+                        </div>
+                        <ul className="px-1 pb-1">
+                          {availableModels
+                            .filter((m) => m.type === "cloud")
+                            .map((model) => (
+                              <li key={model.id}>
+                                <button
+                                  onClick={() => {
+                                    setSelectedModel(model.id);
+                                    setOpen(false);
+                                  }}
+                                  className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
+                                    selectedModel === model.id
+                                      ? "bg-cyan-500/10 text-cyan-400"
+                                      : "text-gray-200 hover:bg-gray-700"
+                                  }`}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 flex-shrink-0" />
+                                  {model.label}
+                                  {selectedModel === model.id && (
+                                    <svg
+                                      className="w-3 h-3 ml-auto"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M5 13l4 4L19 7"
+                                      />
+                                    </svg>
+                                  )}
+                                </button>
+                              </li>
+                            ))}
+                        </ul>
+                      </>
+                    )}
 
-                      <li>
-                        <button
-                          onClick={() => selectOption("local")}
-                          className="w-full text-left px-3 py-2 hover:bg-gray-700 rounded-md"
-                        >
-                          Gemma2 2B (Local)
-                        </button>
-                      </li>
-                    </ul>
+                    {/* Divider if both sections exist */}
+                    {availableModels.some((m) => m.type === "cloud") &&
+                      availableModels.some((m) => m.type === "local") && (
+                        <div className="border-t border-gray-700/50 my-1" />
+                      )}
+
+                    {/* Local section */}
+                    {availableModels.filter((m) => m.type === "local").length >
+                    0 ? (
+                      <>
+                        <div className="px-3 pt-2 pb-1 text-[10px] font-medium text-gray-500 uppercase tracking-wider">
+                          Local
+                        </div>
+                        <ul className="px-1 pb-1">
+                          {availableModels
+                            .filter((m) => m.type === "local")
+                            .map((model) => (
+                              <li key={model.id}>
+                                <button
+                                  onClick={() => {
+                                    setSelectedModel(model.id);
+                                    setOpen(false);
+                                  }}
+                                  className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
+                                    selectedModel === model.id
+                                      ? "bg-green-500/10 text-green-400"
+                                      : "text-gray-200 hover:bg-gray-700"
+                                  }`}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
+                                  {model.label}
+                                  {selectedModel === model.id && (
+                                    <svg
+                                      className="w-3 h-3 ml-auto"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M5 13l4 4L19 7"
+                                      />
+                                    </svg>
+                                  )}
+                                </button>
+                              </li>
+                            ))}
+                        </ul>
+                      </>
+                    ) : (
+                      // No local models installed yet
+                      <div className="px-3 py-3 text-center">
+                        <p className="text-gray-500 text-[11px]">
+                          No local models installed
+                        </p>
+                        <p className="text-gray-600 text-[10px] mt-0.5">
+                          Use Model Manager to download one
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-
-              {/* Send button */}
-              <button
-                onClick={handleSend}
-                disabled={!text.trim() || uploading || querying}
-                className={`rounded-lg transition-all duration-200 ${
-                  (!text.trim() && files.length === 0) || isProcessing
-                    ? "bg-gray-700/50 text-gray-500 cursor-not-allowed"
-                    : "bg-cyan-500/90 hover:bg-cyan-500 text-white shadow-sm hover:shadow-md"
-                } ${isMobile ? "p-3" : "p-2"}`}
-                title="Send message"
-              >
-                <svg
-                  className={`${isMobile ? "w-5 h-5" : "w-4 h-4"}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                  />
-                </svg>
-              </button>
             </div>
           </div>
         </div>
