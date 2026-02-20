@@ -19,7 +19,9 @@ const useQueryDocument = () => {
     setModelsLoading(true);
     try {
       // Fetch local Ollama models
-      const localRes = await fetch("/api/models/installed");
+      const localRes = await fetch(
+        "http://localhost:5000/api/models/installed",
+      );
       const localData = await localRes.json();
       const localModels = (localData.models || []).map((m) => ({
         id: m.name, // e.g. "llama3:latest"
@@ -29,7 +31,11 @@ const useQueryDocument = () => {
 
       // Cloud models are static — add yours here
       const cloudModels = [
-        { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash", type: "cloud" },
+        {
+          id: "gemini-3-flash-preview",
+          label: "Gemini 3.0 Flash",
+          type: "cloud",
+        },
         // add more cloud models here as needed
       ];
 

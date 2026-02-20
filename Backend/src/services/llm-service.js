@@ -1,81 +1,91 @@
-// src/services/LLMService.js using Google Gemini API
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const LocalLLMService = require("./local-llm.service");
 const PromptBuilder = require("../utils/prompt-builder");
+
+// Cloud model registry — add new cloud models here as needed
+const CLOUD_MODELS = {
+  // "gemini-2.0-flash": "gemini-2.0-flash",
+  "gemini-3-flash-preview": "gemini-3-flash-preview",
+};
+
+const DEFAULT_CLOUD_MODEL = "gemini-3-flash-preview";
 
 class LLMService {
   constructor() {
     if (!process.env.GEMINI_API_KEY) {
       throw new Error("GEMINI_API_KEY is missing in environment variables");
     }
-
     this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  }
 
-    // Updated model → Gemini Flash 3 Preview
-    this.model = this.genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
-    });
+  // Get a Gemini model instance dynamically instead of hardcoding in constructor
+  getCloudModel(modelId) {
+    const resolvedModel = CLOUD_MODELS[modelId] || DEFAULT_CLOUD_MODEL;
+    return this.genAI.getGenerativeModel({ model: resolvedModel });
   }
 
   async generateResponse(query, chunks, options = {}) {
-    try {
-      const {
-        instructionTemplate = "default",
-        maxContextLength = 8000,
-        temperature = 0.7,
-        maxOutputTokens = 8192,
-        chatHistory = [],
-        provider = "cloud", // NEW
-      } = options;
+    const {
+      instructionTemplate = "default",
+      maxContextLength = 8000,
+      temperature = 0.7,
+      maxOutputTokens = 8192,
+      chatHistory = [],
+      provider = "cloud",
+      model = null, // specific model ID from frontend
+    } = options;
 
-      if (!chunks || !Array.isArray(chunks)) {
-        throw new Error(`Invalid chunks data: ${typeof chunks}`);
-      }
+    if (!chunks || !Array.isArray(chunks)) {
+      throw new Error(`Invalid chunks data: ${typeof chunks}`);
+    }
 
-      const validChunks = chunks.filter((chunk) => {
-        if (!chunk) return false;
-        if (!chunk.text && !chunk.content) return false;
-        return true;
-      });
+    const validChunks = chunks.filter(
+      (chunk) => chunk && (chunk.text || chunk.content),
+    );
 
-      if (validChunks.length === 0) {
-        throw new Error("No valid chunks available for AI generation");
-      }
+    if (validChunks.length === 0) {
+      throw new Error("No valid chunks available for AI generation");
+    }
 
-      let prompt;
-
-      if (chatHistory && chatHistory.length > 0) {
-        prompt = PromptBuilder.buildConversationalPrompt(
-          query,
-          validChunks,
-          chatHistory,
-          {
+    // Build prompt — same logic as before
+    const prompt =
+      chatHistory && chatHistory.length > 0
+        ? PromptBuilder.buildConversationalPrompt(
+            query,
+            validChunks,
+            chatHistory,
+            {
+              includeMetadata: true,
+              maxContextLength,
+              instructionTemplate,
+            },
+          )
+        : PromptBuilder.buildRAGPrompt(query, validChunks, {
             includeMetadata: true,
             maxContextLength,
             instructionTemplate,
-          },
-        );
-      } else {
-        prompt = PromptBuilder.buildRAGPrompt(query, validChunks, {
-          includeMetadata: true,
-          maxContextLength,
-          instructionTemplate,
-        });
-      }
+          });
 
-      // LOCAL MODEL PATH
-      if (provider === "local") {
-        const answer = await LocalLLMService.generateLocalResponse(prompt);
+    // LOCAL path — pass the specific model name to Ollama
+    if (provider === "local") {
+      const ollamaModel = model || "gemma2:2b"; // fallback if none selected
+      const answer = await LocalLLMService.generateLocalResponse(
+        prompt,
+        ollamaModel,
+      );
+      return {
+        answer,
+        model: ollamaModel,
+        sourcesUsed: validChunks.length,
+      };
+    }
 
-        return {
-          answer,
-          model: "gemma2:2b (ollama)",
-          sourcesUsed: validChunks.length,
-        };
-      }
+    // CLOUD path — resolve which Gemini model to use
+    const cloudModelId = model || DEFAULT_CLOUD_MODEL;
+    const geminiModel = this.getCloudModel(cloudModelId);
 
-      // CLOUD MODEL PATH (Gemini)
-      const result = await this.model.generateContent({
+    try {
+      const result = await geminiModel.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
           temperature,
@@ -85,11 +95,10 @@ class LLMService {
         },
       });
 
-      const answer = result.response.text();
-
       return {
-        answer,
-        model: "gemini-3-flash-preview",
+        answer: result.response.text(),
+        model: cloudModelId,
+        sourcesUsed: validChunks.length,
       };
     } catch (error) {
       console.error("LLM generation error:", error);

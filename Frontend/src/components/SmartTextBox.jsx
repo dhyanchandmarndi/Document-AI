@@ -466,7 +466,7 @@ const SmartTextBox = ({
 
                 {/* Dropdown */}
                 {open && !modelsLoading && (
-                  <div className="absolute right-0 mt-2 bg-[#1a1a1a] border border-gray-700 rounded-xl shadow-lg w-56 overflow-hidden z-10">
+                  <div className="absolute right-0 bottom-full mb-2 bg-[#1a1a1a] border border-gray-700 rounded-xl shadow-lg w-56 overflow-hidden z-10">
                     {/* Cloud section */}
                     {availableModels.filter((m) => m.type === "cloud").length >
                       0 && (
@@ -579,6 +579,32 @@ const SmartTextBox = ({
                   </div>
                 )}
               </div>
+
+              {/* Send Button*/}
+              <button
+                onClick={handleSend}
+                disabled={!text.trim() || uploading || querying}
+                className={`rounded-lg transition-all duration-200 ${
+                  (!text.trim() && files.length === 0) || isProcessing
+                    ? "bg-gray-700/50 text-gray-500 cursor-not-allowed"
+                    : "bg-cyan-500/90 hover:bg-cyan-500 text-white shadow-sm hover:shadow-md"
+                } ${isMobile ? "p-3" : "p-2"}`}
+                title="Send message"
+              >
+                <svg
+                  className={`${isMobile ? "w-5 h-5" : "w-4 h-4"}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                  />
+                </svg>
+              </button>
             </div>
           </div>
         </div>

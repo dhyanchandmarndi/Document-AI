@@ -14,6 +14,7 @@ class QueryController {
         useAI = false,
         conversationId,
         provider = "cloud",
+        model = null, // ADD THIS — specific model ID from frontend
       } = req.body;
 
       console.log(`Processing query for user ${userId}: "${query}"`);
@@ -126,6 +127,7 @@ class QueryController {
             instructionTemplate: "default",
             chatHistory: chatHistory,
             provider,
+            model,
           },
         );
         console.log("AI Answer:", aiResponse.answer);
