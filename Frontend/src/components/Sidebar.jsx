@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import useConversations from "../hooks/useConversations";
 import ConfirmModal from "./ConfirmModal";
+import { Plus } from "lucide-react";
 
 const Sidebar = ({
   collapsed,
@@ -121,6 +122,7 @@ const Sidebar = ({
   const handleSelectConversation = (conversation) => {
     if (onSelectConversation) {
       onSelectConversation(conversation);
+      onNavigate("chat");
     }
 
     // Close sidebar on mobile after selection
@@ -158,7 +160,7 @@ const Sidebar = ({
             >
               {(!collapsed || isMobile) && (
                 <div className="flex items-center">
-                  <span className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                  <span className="text-xl font-bold font-heading bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
                     DocumentAI
                   </span>
                 </div>
@@ -202,12 +204,11 @@ const Sidebar = ({
           </div>
 
           {/* New Chat Button */}
-          <div className="flex-shrink-0 p-4">
+          <div className="flex-shrink-0 px-4">
             <button
               onClick={onNewChat}
-              className={`w-full flex items-center justify-center p-3 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-cyan-500/25 ${
-                collapsed && !isMobile ? "px-2" : "px-3"
-              }`}
+              className={`w-full flex items-center p-3 rounded-xl bg-gradient-to-r  text-white font-medium transition-all duration-200 shadow-lg hover:bg-neutral-700
+      active:bg-neutral-700 ${collapsed && !isMobile ? "px-2" : "px-3"}`}
               title="Start new chat"
             >
               <svg
@@ -230,26 +231,39 @@ const Sidebar = ({
           </div>
 
           {/* Models Button */}
-          <div className="flex-shrink-0 p-4">
+          <div className="flex-shrink-0 px-4">
             <button
               onClick={handleModelsClick}
-              className={`w-full flex items-center justify-center p-3 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-cyan-500/25 ${
-                collapsed && !isMobile ? "px-2" : "px-3"
-              }`}
+              className={`w-full flex items-center p-3 rounded-xl bg-gradient-to-r  text-white font-medium transition-all duration-200 shadow-lg hover:bg-neutral-700
+      active:bg-neutral-700 ${collapsed && !isMobile ? "px-2" : "px-3"}`}
               title="Start new chat"
             >
               <svg
-                className="w-5 h-5"
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                viewBox="0 0 24 24"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="lucide lucide-cpu-icon lucide-cpu"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
+                <path d="M12 20v2" />
+                <path d="M12 2v2" />
+                <path d="M17 20v2" />
+                <path d="M17 2v2" />
+                <path d="M2 12h2" />
+                <path d="M2 17h2" />
+                <path d="M2 7h2" />
+                <path d="M20 12h2" />
+                <path d="M20 17h2" />
+                <path d="M20 7h2" />
+                <path d="M7 20v2" />
+                <path d="M7 2v2" />
+                <rect x="4" y="4" width="16" height="16" rx="2" />
+                <rect x="8" y="8" width="8" height="8" rx="1" />
               </svg>
               {(!collapsed || isMobile) && <span className="ml-2">Models</span>}
             </button>

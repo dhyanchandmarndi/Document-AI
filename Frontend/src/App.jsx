@@ -305,7 +305,12 @@ export default function App() {
               />
             )}
 
-            {activeView === "models" && <ModelsManager isMobile={isMobile} />}
+            {activeView === "models" && (
+              <ModelsManager
+                isMobile={isMobile}
+                onToggleSidebar={toggleSidebar}
+              />
+            )}
           </div>
         </>
       )}

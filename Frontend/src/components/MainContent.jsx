@@ -18,7 +18,7 @@ const MainContent = ({
         <div className="flex-shrink-0 p-4 border-b border-gray-700/50 bg-[#0a0a0a]">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <span className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+              <span className="text-xl font-bold font-heading bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
                 DocumentAI
               </span>
             </div>
@@ -61,25 +61,25 @@ const MainContent = ({
               }`}
             >
               <h1
-                className={`font-bold bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent ${
+                className={`font-bold font-heading bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent ${
                   isMobile
                     ? "text-3xl sm:text-4xl mb-3"
                     : "text-4xl sm:text-5xl lg:text-6xl mb-4"
                 }`}
               >
-                Document
-                <span className="bg-gradient-to-r from-cyan-400 to-cyan-500 bg-clip-text text-transparent">
-                  AI
-                </span>
+                What can I help you
+                <h1 className="bg-gradient-to-r  bg-clip-text text-transparent">
+                  understand today?
+                </h1>
               </h1>
               <p
-                className={`text-gray-400 mx-auto leading-relaxed ${
+                className={`text-gray-400 font-body mx-auto leading-relaxed ${
                   isMobile
                     ? "text-base max-w-xs"
                     : "text-lg sm:text-xl max-w-md sm:max-w-lg lg:max-w-xl"
                 }`}
               >
-                Your GenAI-powered Document Intelligence Platform
+                Upload a document and ask anything- I&apos;ll handle the rest.
               </p>
             </div>
 

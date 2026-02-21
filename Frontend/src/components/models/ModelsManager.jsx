@@ -1,7 +1,7 @@
 // components/ModelsManager.jsx
 import React, { useState, useEffect } from "react";
 
-const ModelsManager = ({ isMobile }) => {
+const ModelsManager = ({ isMobile, onToggleSidebar }) => {
   const [installedModels, setInstalledModels] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -178,6 +178,37 @@ const ModelsManager = ({ isMobile }) => {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#0a0a0a] overflow-hidden">
+      {/* Mobile header */}
+      {isMobile && (
+        <div className="flex-shrink-0 p-4 border-b border-gray-700/50 bg-[#0a0a0a]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <span className="text-xl font-bold font-heading bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                DocumentAI
+              </span>
+            </div>
+            <button
+              onClick={onToggleSidebar}
+              className="p-2 rounded-lg hover:bg-gray-800/60 transition-colors"
+              title="Open menu"
+            >
+              <svg
+                className="w-6 h-6 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
       {/* Header — mirrors MainContent's welcome header style */}
       <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 pt-8 pb-6 border-b border-white/5">
         <div
@@ -188,18 +219,16 @@ const ModelsManager = ({ isMobile }) => {
           }`}
         >
           <h1
-            className={`font-bold bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent ${
+            className={`font-bold font-heading bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent ${
               isMobile
                 ? "text-3xl sm:text-4xl mb-1"
                 : "text-4xl sm:text-5xl mb-2"
             }`}
           >
-            Model
-            <span className="bg-gradient-to-r from-cyan-400 to-cyan-500 bg-clip-text text-transparent">
-              Manager
-            </span>
+            Model Manager
+            <span className="bg-gradient-to-r from-cyan-400 to-cyan-500 bg-clip-text text-transparent"></span>
           </h1>
-          <p className="text-gray-400 text-base sm:text-lg leading-relaxed">
+          <p className="text-gray-400 font-body text-base sm:text-lg leading-relaxed">
             View, search, and manage your local Ollama models
           </p>
         </div>
@@ -438,14 +467,46 @@ const ModelsManager = ({ isMobile }) => {
                       d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                     />
                   </svg>
+
                   <input
                     type="text"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      if (!e.target.value.trim()) {
+                        setSearchResults([]); // ✅ Auto-clear results
+                      }
+                    }}
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                     placeholder="Search Ollama models (e.g. llama3, mistral…)"
-                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-cyan-500/40 focus:bg-white/[0.06] transition-all duration-200"
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-cyan-500/40 focus:bg-white/[0.06] transition-all duration-200"
                   />
+
+                  {/* ✅ Clear button — only shows when there's text */}
+                  {searchQuery && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setSearchResults([]);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                      title="Clear search"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  )}
                 </div>
                 <button
                   onClick={handleSearch}
