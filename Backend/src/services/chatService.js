@@ -1,22 +1,32 @@
 // src/services/chatService.js
-const { db } = require('../models');
+const { db } = require("../models");
+const logger = require("../config/logger");
 
 class ChatService {
-  
   // Create new conversation
-  async createConversation(userId, title = 'New Conversation') {
+  async createConversation(userId, title = "New Conversation") {
     try {
       const conversation = await db.Conversation.create({
         user_id: userId,
-        title: title
+        title: title,
+      });
+
+      logger.info("Conversation created", {
+        userId,
+        conversationId: conversation.id,
+        title,
       });
 
       return {
         success: true,
         conversation: conversation,
-        message: 'Conversation created successfully'
+        message: "Conversation created successfully",
       };
     } catch (error) {
+      logger.error("Failed to create conversation", {
+        userId,
+        error: error.message,
+      });
       throw new Error(`Failed to create conversation: ${error.message}`);
     }
   }
@@ -25,22 +35,33 @@ class ChatService {
   async getUserConversations(userId, options = {}) {
     try {
       const conversations = await db.Conversation.findByUser(userId, {
-        include: [{
-          model: db.Message,
-          as: 'messages',
-          attributes: ['id', 'query_text', 'created_at'],
-          limit: 1,
-          order: [['created_at', 'DESC']]
-        }],
-        ...options
+        include: [
+          {
+            model: db.Message,
+            as: "messages",
+            attributes: ["id", "query_text", "created_at"],
+            limit: 1,
+            order: [["created_at", "DESC"]],
+          },
+        ],
+        ...options,
+      });
+
+      logger.debug("Fetched user conversations", {
+        userId,
+        count: conversations.length,
       });
 
       return {
         success: true,
         conversations: conversations,
-        count: conversations.length
+        count: conversations.length,
       };
     } catch (error) {
+      logger.error("Failed to get conversations", {
+        userId,
+        error: error.message,
+      });
       throw new Error(`Failed to get conversations: ${error.message}`);
     }
   }
@@ -49,81 +70,93 @@ class ChatService {
   async getConversationWithMessages(conversationId, userId) {
     try {
       const conversation = await db.Conversation.findOne({
-        where: { 
+        where: {
           id: conversationId,
-          user_id: userId
+          user_id: userId,
         },
-        include: [{
-          model: db.Message,
-          as: 'messages',
-          attributes: [
-            'id', 
-            'query_text', 
-            'ai_response', 
-            'document_ids', 
-            'chunks_used', 
-            'processing_time', 
-            'model_name', 
-            'error', 
-            'error_message', 
-            'created_at'
-          ]
-        }],
-        order: [
-          [{ model: db.Message, as: 'messages' }, 'created_at', 'ASC']
-        ]
+        include: [
+          {
+            model: db.Message,
+            as: "messages",
+            attributes: [
+              "id",
+              "query_text",
+              "ai_response",
+              "document_ids",
+              "chunks_used",
+              "processing_time",
+              "model_name",
+              "error",
+              "error_message",
+              "created_at",
+            ],
+          },
+        ],
+        order: [[{ model: db.Message, as: "messages" }, "created_at", "ASC"]],
       });
 
       if (!conversation) {
-        throw new Error('Conversation not found');
+        logger.warn("Conversation not found", { conversationId, userId });
+        throw new Error("Conversation not found");
       }
 
-      // ADD: Fetch document details for each message
-    const conversationData = conversation.toJSON();
-    
-    // Get all unique document IDs from all messages
-    const allDocumentIds = new Set();
-    conversationData.messages.forEach(msg => {
-      if (msg.document_ids && Array.isArray(msg.document_ids)) {
-        msg.document_ids.forEach(id => allDocumentIds.add(id));
+      const conversationData = conversation.toJSON();
+
+      // Get all unique document IDs from all messages
+      const allDocumentIds = new Set();
+      conversationData.messages.forEach((msg) => {
+        if (msg.document_ids && Array.isArray(msg.document_ids)) {
+          msg.document_ids.forEach((id) => allDocumentIds.add(id));
+        }
+      });
+
+      // Fetch all documents at once (efficient)
+      let documentsMap = {};
+      if (allDocumentIds.size > 0) {
+        const documents = await db.Document.findAll({
+          where: {
+            id: Array.from(allDocumentIds),
+            user_id: userId,
+          },
+          attributes: ["id", "original_filename", "total_pages", "chunk_count"],
+        });
+
+        documents.forEach((doc) => {
+          documentsMap[doc.id] = {
+            id: doc.id,
+            name: doc.original_filename,
+            pages: doc.total_pages,
+            chunks: doc.chunk_count,
+          };
+        });
       }
-    });
 
-    // Fetch all documents at once (efficient)
-    let documentsMap = {};
-    if (allDocumentIds.size > 0) {
-      const documents = await db.Document.findAll({
-        where: {
-          id: Array.from(allDocumentIds),
-          user_id: userId
-        },
-        attributes: ['id', 'original_filename', 'total_pages', 'chunk_count']
+      // Attach document details to each message
+      conversationData.messages = conversationData.messages.map((msg) => ({
+        ...msg,
+        documents: msg.document_ids
+          ? msg.document_ids.map((id) => documentsMap[id]).filter(Boolean)
+          : [],
+        errorMessage: msg.error_message || null,
+      }));
+
+      logger.debug("Fetched conversation with messages", {
+        conversationId,
+        userId,
+        messageCount: conversationData.messages.length,
+        uniqueDocuments: allDocumentIds.size,
       });
 
-      // Create a map for quick lookup
-      documents.forEach(doc => {
-        documentsMap[doc.id] = {
-          id: doc.id,
-          name: doc.original_filename,
-          pages: doc.total_pages,
-          chunks: doc.chunk_count
-        };
-      });
-    }
-
-    // Attach document details to each message
-    conversationData.messages = conversationData.messages.map(msg => ({
-      ...msg,
-      documents: msg.document_ids 
-        ? msg.document_ids.map(id => documentsMap[id]).filter(Boolean)
-        : []
-    }));
-
-    return {
-      success: true,
-      conversation: conversationData
-    };
+      return {
+        success: true,
+        conversation: conversationData,
+      };
     } catch (error) {
+      logger.error("Failed to get conversation", {
+        conversationId,
+        userId,
+        error: error.message,
+      });
       throw new Error(`Failed to get conversation: ${error.message}`);
     }
   }
@@ -134,22 +167,37 @@ class ChatService {
       const conversation = await db.Conversation.findOne({
         where: {
           id: conversationId,
-          user_id: userId
-        }
+          user_id: userId,
+        },
       });
 
       if (!conversation) {
-        throw new Error('Conversation not found');
+        logger.warn("Conversation not found for title update", {
+          conversationId,
+          userId,
+        });
+        throw new Error("Conversation not found");
       }
 
       await conversation.updateTitle(title);
 
+      logger.info("Conversation title updated", {
+        conversationId,
+        userId,
+        title,
+      });
+
       return {
         success: true,
         conversation: conversation,
-        message: 'Conversation title updated'
+        message: "Conversation title updated",
       };
     } catch (error) {
+      logger.error("Failed to update conversation title", {
+        conversationId,
+        userId,
+        error: error.message,
+      });
       throw new Error(`Failed to update conversation: ${error.message}`);
     }
   }
@@ -160,21 +208,32 @@ class ChatService {
       const conversation = await db.Conversation.findOne({
         where: {
           id: conversationId,
-          user_id: userId
-        }
+          user_id: userId,
+        },
       });
 
       if (!conversation) {
-        throw new Error('Conversation not found');
+        logger.warn("Conversation not found for deletion", {
+          conversationId,
+          userId,
+        });
+        throw new Error("Conversation not found");
       }
 
       await conversation.destroy();
 
+      logger.info("Conversation deleted", { conversationId, userId });
+
       return {
         success: true,
-        message: 'Conversation deleted successfully'
+        message: "Conversation deleted successfully",
       };
     } catch (error) {
+      logger.error("Failed to delete conversation", {
+        conversationId,
+        userId,
+        error: error.message,
+      });
       throw new Error(`Failed to delete conversation: ${error.message}`);
     }
   }
@@ -182,16 +241,19 @@ class ChatService {
   // Create message in conversation
   async createMessage(conversationId, userId, messageData) {
     try {
-      // Verify conversation belongs to user
       const conversation = await db.Conversation.findOne({
         where: {
           id: conversationId,
-          user_id: userId
-        }
+          user_id: userId,
+        },
       });
 
       if (!conversation) {
-        throw new Error('Conversation not found');
+        logger.warn("Conversation not found for message creation", {
+          conversationId,
+          userId,
+        });
+        throw new Error("Conversation not found");
       }
 
       const message = await db.Message.create({
@@ -204,7 +266,7 @@ class ChatService {
         processing_time: messageData.processingTime || null,
         model_name: messageData.modelName || null,
         error: messageData.error || false,
-        error_message: messageData.errorMessage || null
+        error_message: messageData.errorMessage || null,
       });
 
       // Update conversation's updated_at timestamp
@@ -212,17 +274,35 @@ class ChatService {
       await conversation.save();
 
       // Auto-generate title from first message if still default
-      if (conversation.title === 'New Conversation') {
+      if (conversation.title === "New Conversation") {
         const generatedTitle = this.generateTitle(messageData.queryText);
         await conversation.updateTitle(generatedTitle);
+        logger.debug("Auto-generated conversation title", {
+          conversationId,
+          generatedTitle,
+        });
       }
+
+      logger.info("Message created", {
+        conversationId,
+        userId,
+        messageId: message.id,
+        documentCount: (messageData.documentIds || []).length,
+        hasError: messageData.error || false,
+        // Never log queryText — it may contain sensitive document content
+      });
 
       return {
         success: true,
         message: message,
-        conversation: conversation
+        conversation: conversation,
       };
     } catch (error) {
+      logger.error("Failed to create message", {
+        conversationId,
+        userId,
+        error: error.message,
+      });
       throw new Error(`Failed to create message: ${error.message}`);
     }
   }
@@ -233,25 +313,43 @@ class ChatService {
       const message = await db.Message.findOne({
         where: {
           id: messageId,
-          user_id: userId
-        }
+          user_id: userId,
+        },
       });
 
       if (!message) {
-        throw new Error('Message not found');
+        logger.warn("Message not found for response update", {
+          messageId,
+          userId,
+        });
+        throw new Error("Message not found");
       }
 
       await message.setAIResponse(responseData.aiResponse, {
         chunksUsed: responseData.chunksUsed,
         processingTime: responseData.processingTime,
-        modelName: responseData.modelName
+        modelName: responseData.modelName,
+      });
+
+      // This is gold for Document AI cost tracking
+      logger.info("AI response saved", {
+        messageId,
+        userId,
+        chunksUsed: responseData.chunksUsed,
+        processingTimeMs: responseData.processingTime,
+        modelName: responseData.modelName,
       });
 
       return {
         success: true,
-        message: message
+        message: message,
       };
     } catch (error) {
+      logger.error("Failed to update message with response", {
+        messageId,
+        userId,
+        error: error.message,
+      });
       throw new Error(`Failed to update message: ${error.message}`);
     }
   }
@@ -262,21 +360,36 @@ class ChatService {
       const message = await db.Message.findOne({
         where: {
           id: messageId,
-          user_id: userId
-        }
+          user_id: userId,
+        },
       });
 
       if (!message) {
-        throw new Error('Message not found');
+        logger.warn("Message not found to mark as error", {
+          messageId,
+          userId,
+        });
+        throw new Error("Message not found");
       }
 
       await message.markAsError(errorMessage);
 
+      logger.warn("Message marked as error", {
+        messageId,
+        userId,
+        errorMessage,
+      });
+
       return {
         success: true,
-        message: message
+        message: message,
       };
     } catch (error) {
+      logger.error("Failed to mark message as error", {
+        messageId,
+        userId,
+        error: error.message,
+      });
       throw new Error(`Failed to mark message as error: ${error.message}`);
     }
   }
@@ -284,74 +397,94 @@ class ChatService {
   // Get messages for conversation
   async getConversationMessages(conversationId, userId, options = {}) {
     try {
-      // Verify conversation belongs to user
       const conversation = await db.Conversation.findOne({
         where: {
           id: conversationId,
-          user_id: userId
-        }
+          user_id: userId,
+        },
       });
 
       if (!conversation) {
-        throw new Error('Conversation not found');
+        logger.warn("Conversation not found for message fetch", {
+          conversationId,
+          userId,
+        });
+        throw new Error("Conversation not found");
       }
 
-      const messages = await db.Message.findByConversation(conversationId, options);
+      const messages = await db.Message.findByConversation(
+        conversationId,
+        options,
+      );
+
+      logger.debug("Fetched conversation messages", {
+        conversationId,
+        userId,
+        count: messages.length,
+      });
 
       return {
         success: true,
         messages: messages,
-        count: messages.length
+        count: messages.length,
       };
     } catch (error) {
+      logger.error("Failed to get messages", {
+        conversationId,
+        userId,
+        error: error.message,
+      });
       throw new Error(`Failed to get messages: ${error.message}`);
     }
   }
+
   async getRecentMessages(conversationId, userId, limit = 5) {
     try {
-      // Fetch recent messages from database
       const messages = await db.Message.findAll({
         where: {
           conversation_id: conversationId,
-          user_id: userId
+          user_id: userId,
         },
-        attributes: ['query_text', 'ai_response', 'created_at'],
-        order: [['created_at', 'DESC']], // Most recent first
-        limit: limit
+        attributes: ["query_text", "ai_response", "created_at"],
+        order: [["created_at", "DESC"]],
+        limit: limit,
       });
 
       if (!messages || messages.length === 0) {
+        logger.debug("No recent messages found", { conversationId, userId });
         return [];
       }
 
-      // Format chat history (reverse to get chronological order)
       const formattedHistory = [];
-      
-      // Reverse to get oldest first (chronological order)
-      messages.reverse().forEach(msg => {
-        // Add user message
+
+      messages.reverse().forEach((msg) => {
         if (msg.query_text) {
-          formattedHistory.push({
-            role: 'user',
-            content: msg.query_text
-          });
+          formattedHistory.push({ role: "user", content: msg.query_text });
         }
-        
-        // Add assistant response
         if (msg.ai_response) {
           formattedHistory.push({
-            role: 'assistant',
-            content: msg.ai_response
+            role: "assistant",
+            content: msg.ai_response,
           });
         }
       });
 
-      console.log(`Retrieved ${formattedHistory.length} messages for conversation context`);
-      return formattedHistory;
+      logger.debug("Retrieved recent messages for context", {
+        conversationId,
+        userId,
+        messagesRetrieved: messages.length,
+        formattedCount: formattedHistory.length,
+      });
 
+      return formattedHistory;
     } catch (error) {
-      console.error('Error getting recent messages:', error);
-      return []; // Return empty array on error (graceful fallback)
+      // Graceful fallback — log but don't crash the LLM pipeline
+      logger.error("Failed to get recent messages, returning empty context", {
+        conversationId,
+        userId,
+        error: error.message,
+      });
+      return [];
     }
   }
 
@@ -359,11 +492,11 @@ class ChatService {
   generateTitle(queryText) {
     const maxLength = 50;
     let title = queryText.trim();
-    
+
     if (title.length > maxLength) {
-      title = title.substring(0, maxLength).trim() + '...';
+      title = title.substring(0, maxLength).trim() + "...";
     }
-    
+
     return title;
   }
 }

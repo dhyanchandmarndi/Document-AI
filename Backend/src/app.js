@@ -17,6 +17,10 @@ const models = require("./routes/models");
 const PORT = process.env.PORT || 8000;
 const app = express();
 
+const logger = require("./config/logger");
+const morganMiddleware = require("./config/morgan");
+app.use(morganMiddleware); // HTTP request logs
+
 app.use(helmet());
 app.use(
   cors({
@@ -31,6 +35,8 @@ app.use(
 // Middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+logger.info("Server starting up", { port: process.env.PORT || 3000 });
 
 // Rate limiting
 // const limiter = rateLimit({
@@ -116,6 +122,11 @@ app.use((req, res) => {
     success: false,
     error: "Route not found",
   });
+});
+
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: "Something went wrong" });
 });
 
 async function startServer() {

@@ -93,7 +93,7 @@ export default function App() {
       timestamp: new Date(),
       aiResponse: null,
       error: false,
-      errorMessage: null,
+      error_message: null,
       isLoading: false,
     };
 
@@ -157,6 +157,11 @@ export default function App() {
               : msg,
           ),
         );
+
+        // Refresh sidebar so the conversation shows up
+        if (sidebarRefreshRef.current) {
+          sidebarRefreshRef.current();
+        }
       }
     }
   };

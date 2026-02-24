@@ -1,32 +1,37 @@
 const { exec, spawn } = require("child_process");
 const https = require("https");
+const logger = require("../config/logger");
 
 class ModelManager {
   // List installed Ollama models
   listModels() {
     return new Promise((resolve, reject) => {
       exec("ollama list", (error, stdout) => {
-        if (error) return reject(error);
+        if (error) {
+          logger.error("Failed to list Ollama models", {
+            error: error.message,
+          });
+          return reject(error);
+        }
 
-        const lines = stdout
-          .split("\n")
-          .slice(1) // remove header
-          .filter(Boolean);
+        const lines = stdout.split("\n").slice(1).filter(Boolean);
 
         const models = lines.map((line) => {
           const parts = line.trim().split(/\s+/);
-
           return {
             name: parts[0],
             id: parts[1],
             size: parseSizeToBytes(parts[2] + (parts[3] ? ` ${parts[3]}` : "")),
             modified_at: new Date().toISOString(),
             details: {
-              parameter_size: null, // not available from list output
+              parameter_size: null,
             },
           };
         });
 
+        logger.debug("Listed installed Ollama models", {
+          count: models.length,
+        });
         resolve({ models });
       });
     });
@@ -37,6 +42,8 @@ class ModelManager {
     return new Promise((resolve, reject) => {
       const url = `https://ollama.com/search?q=${encodeURIComponent(query)}`;
 
+      logger.debug("Searching Ollama model library", { query });
+
       https
         .get(url, { headers: { "User-Agent": "Mozilla/5.0" } }, (res) => {
           let html = "";
@@ -44,19 +51,36 @@ class ModelManager {
           res.on("end", () => {
             try {
               const models = parseOllamaSearchResults(html);
+              logger.debug("Ollama model search complete", {
+                query,
+                resultsFound: models.length,
+              });
               resolve({ models });
             } catch (err) {
+              logger.error("Failed to parse Ollama search results", {
+                query,
+                error: err.message,
+              });
               reject(err);
             }
           });
         })
-        .on("error", reject);
+        .on("error", (err) => {
+          logger.error("Ollama search request failed", {
+            query,
+            url,
+            error: err.message,
+          });
+          reject(err);
+        });
     });
   }
 
-  // Download models
   // Stream pull progress via spawn instead of exec
   pullModelStream(modelName, onData, onError, onComplete) {
+    logger.info("Starting Ollama model pull", { modelName });
+
+    const startTime = Date.now();
     const process = spawn("ollama", ["pull", modelName]);
 
     process.stdout.on("data", (data) => {
@@ -65,32 +89,53 @@ class ModelManager {
     });
 
     process.stderr.on("data", (data) => {
+      // Ollama writes pull progress to stderr — treat as data, not errors
       const lines = data.toString().split("\n").filter(Boolean);
-      // Ollama actually writes progress to stderr, treat it as data not error
       lines.forEach((line) => onData(line));
     });
 
     process.on("error", (err) => {
+      logger.error("Ollama pull process error", {
+        modelName,
+        error: err.message,
+      });
       onError(err.message);
     });
 
     process.on("close", (code) => {
+      const latencyMs = Date.now() - startTime;
+
       if (code === 0) {
+        logger.info("Ollama model pull complete", { modelName, latencyMs });
         onComplete();
       } else {
+        logger.error("Ollama model pull failed", {
+          modelName,
+          exitCode: code,
+          latencyMs,
+        });
         onError(`Process exited with code ${code}`);
       }
     });
 
-    // Return process so caller can kill it if needed
     return process;
   }
 
-  // Delete models
+  // Delete model
   deleteModel(modelName) {
     return new Promise((resolve, reject) => {
+      logger.info("Deleting Ollama model", { modelName });
+
       exec(`ollama rm ${modelName}`, (error, stdout) => {
-        if (error) return reject(error);
+        if (error) {
+          logger.error("Failed to delete Ollama model", {
+            modelName,
+            error: error.message,
+          });
+          return reject(error);
+        }
+
+        logger.info("Ollama model deleted", { modelName });
         resolve(stdout);
       });
     });
@@ -100,7 +145,6 @@ class ModelManager {
 function parseSizeToBytes(sizeStr) {
   const [value, unit] = sizeStr.split(" ");
   const num = parseFloat(value);
-
   if (unit === "GB") return num * 1e9;
   if (unit === "MB") return num * 1e6;
   return num;
@@ -108,62 +152,41 @@ function parseSizeToBytes(sizeStr) {
 
 function parseOllamaSearchResults(html) {
   const models = [];
-
-  // Each model card contains the name in an anchor tag like:
-  // <h2 ...><a href="/library/llama3">llama3</a></h2>
-  // We extract name, description, pull count, and tag count
-
-  // Match model blocks — each result is wrapped in a list item or article
-  // This regex targets the model name from href="/library/<name>"
   const modelPattern = /href="\/library\/([^"]+)"[^>]*>/g;
   const names = new Set();
   let match;
 
   while ((match = modelPattern.exec(html)) !== null) {
     const name = match[1];
-    // Filter out nav links and pagination — valid model names have no slashes
     if (!name.includes("/") && !name.includes("?") && name.length > 0) {
       names.add(name);
     }
   }
 
-  // For each name, try to extract description and metadata from surrounding HTML
   names.forEach((name) => {
-    // Find the block of HTML around this model's entry
     const blockStart = html.indexOf(`/library/${name}"`);
     if (blockStart === -1) return;
 
-    // Grab a chunk of HTML around the link to extract metadata
     const block = html.substring(blockStart, blockStart + 1500);
 
-    // Extract description — usually in a <p> tag after the title
     const descMatch = block.match(/<p[^>]*>([\s\S]*?)<\/p>/);
     const description = descMatch
       ? descMatch[1].replace(/<[^>]+>/g, "").trim()
       : "";
 
-    // Extract pull count — looks like "1.2M pulls" or "45.3K pulls"
     const pullsMatch = block.match(/([\d.]+[KMB]?)\s*pulls/i);
     const pullsRaw = pullsMatch ? pullsMatch[1] : null;
     const pulls = pullsRaw ? parseShortNumber(pullsRaw) : null;
 
-    // Extract tags count — looks like "72 tags"
     const tagsMatch = block.match(/([\d]+)\s*tags?/i);
     const tags = tagsMatch ? parseInt(tagsMatch[1]) : null;
 
-    // Extract last updated — looks like "6 weeks ago" or "3 months ago"
     const updatedMatch = block.match(
       /(\d+\s+(?:hour|day|week|month|year)s?\s+ago)/i,
     );
     const updated = updatedMatch ? updatedMatch[1] : null;
 
-    models.push({
-      name,
-      description,
-      pulls,
-      tags,
-      updated,
-    });
+    models.push({ name, description, pulls, tags, updated });
   });
 
   return models;

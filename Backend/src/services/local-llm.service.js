@@ -1,9 +1,11 @@
 const axios = require("axios");
+const logger = require("../config/logger");
 
-const OLLAMA_URL = "http://127.0.0.1:11434/api/generate";
+const OLLAMA_URL = process.env.OLLAMA_URL;
 
-// Accept modelName so any installed Ollama model can be used
 async function generateLocalResponse(prompt, modelName = "gemma2:2b") {
+  const startTime = Date.now();
+
   try {
     const response = await axios.post(OLLAMA_URL, {
       model: modelName,
@@ -11,9 +13,24 @@ async function generateLocalResponse(prompt, modelName = "gemma2:2b") {
       stream: false,
     });
 
+    const latencyMs = Date.now() - startTime;
+
+    logger.info("Ollama local response generated", {
+      model: modelName, // fix: was referencing undefined `model`
+      latencyMs,
+    });
+
     return response.data.response;
   } catch (error) {
-    console.error("Ollama error:", error.message);
+    const latencyMs = Date.now() - startTime;
+
+    logger.error("Ollama request failed", {
+      model: modelName,
+      ollamaUrl: OLLAMA_URL,
+      error: error.message,
+      latencyMs,
+    });
+
     throw new Error(
       `Local LLM failed for model "${modelName}": ${error.message}`,
     );

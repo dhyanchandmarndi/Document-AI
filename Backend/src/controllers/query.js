@@ -190,6 +190,31 @@ class QueryController {
     } catch (error) {
       console.error("Query processing error:", error);
 
+      // Persist error to DB so it survives page refresh
+      if (messageId) {
+        try {
+          await chatService.markMessageAsError(
+            messageId,
+            userId,
+            error.message || "Failed to process query",
+          );
+        } catch (saveError) {
+          console.error("Failed to persist error state:", saveError);
+        }
+      } else if (conversationId && userId) {
+        // Message was never created (failed before Step 1), create it now with error state
+        try {
+          await chatService.createMessage(conversationId, userId, {
+            queryText: query,
+            documentIds: resolvedDocumentIds || [],
+            error: true,
+            errorMessage: error.message || "Failed to process query",
+          });
+        } catch (saveError) {
+          console.error("Failed to save error message:", saveError);
+        }
+      }
+
       res.status(500).json({
         success: false,
         message: "Failed to process query",
